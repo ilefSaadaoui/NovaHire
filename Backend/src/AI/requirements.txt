@@ -1,0 +1,30 @@
+# NovaHire AI Service - Dependencies
+# Core API
+fastapi==0.110.0
+uvicorn==0.27.1
+python-multipart==0.0.9
+pydantic-settings>=2.0.0
+
+# PDF Extraction
+pdfplumber==0.10.4
+pymupdf>=1.23.0
+
+# DOCX Extraction
+docx2txt>=0.8
+python-docx>=1.1.0
+
+# NLP & ML
+spacy>=3.8.0
+sentence-transformers>=2.7.0
+torch --index-url https://download.pytorch.org/whl/cpu
+
+# OCR principal : Tesseract (rapide, précis, multilingue FR/EN)
+pytesseract>=0.3.10
+Pillow>=10.0.0
+# OCR fallback (lazy-loaded, pour cas complexes)
+easyocr
+
+# Utilities
+python-dotenv==1.0.1
+httpx==0.24.1
+groq>=0.4.0

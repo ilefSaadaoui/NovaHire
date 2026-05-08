@@ -1,0 +1,32 @@
+{
+  "name": "auth-app",
+  "version": "1.0.0",
+  "description": "Application Vue.js avec authentification",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit --skipLibCheck"
+  },
+  "dependencies": {
+    "axios": "^1.13.6",
+    "chart.js": "^4.5.1",
+
+    "lucide-vue-next": "^1.0.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.4.0",
+    "vue-chartjs": "^5.3.3",
+    "vue-i18n": "^9.14.5",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^20.x",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "playwright": "^1.58.2",
+    "typescript": "^5.x",
+    "vite": "^5.0.0",
+    "vue-tsc": "^2.x"
+  }
+}

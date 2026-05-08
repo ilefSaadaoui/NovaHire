@@ -1,0 +1,92 @@
+/* vivid-bg.css - Elite Animated Mesh Gradient System */
+
+.vivid-mesh-system {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-primary, #0f172a);
+  transition: background 0.5s ease;
+  pointer-events: none !important;
+}
+
+.mesh-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+  mix-blend-mode: screen;
+  transition: all 1s ease-in-out;
+}
+
+/* Blob 1: Primary Gold (Prestigious & Bright) */
+.mesh-blob-1 {
+  width: 70vw;
+  height: 70vw;
+  background: radial-gradient(circle, #fcd34d 0%, transparent 70%);
+  top: -20%;
+  left: -10%;
+  opacity: 0.3;
+  animation: mesh-float-1 25s infinite alternate ease-in-out;
+}
+
+/* Blob 2: Deep Amber (Warmth & Depth) */
+.mesh-blob-2 {
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, #d97706 0%, transparent 70%);
+  bottom: -15%;
+  right: -10%;
+  opacity: 0.25;
+  animation: mesh-float-2 30s infinite alternate-reverse ease-in-out;
+}
+
+/* Blob 3: Silk White/Cream (Luminosity) */
+.mesh-blob-3 {
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(circle, #fff7ed 0%, transparent 70%);
+  top: 30%;
+  left: 20%;
+  opacity: 0.15;
+  animation: mesh-float-3 35s infinite alternate ease-in-out;
+}
+
+@keyframes mesh-float-1 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  100% { transform: translate(15%, 10%) scale(1.1) rotate(45deg); }
+}
+
+@keyframes mesh-float-2 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  100% { transform: translate(-20%, -15%) scale(1.2) rotate(-30deg); }
+}
+
+@keyframes mesh-float-3 {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.1; }
+  50% { opacity: 0.3; }
+  100% { transform: translate(10%, -10%) scale(0.9); opacity: 0.1; }
+}
+
+/* Dark Mode Tint */
+.dark-mode .vivid-mesh-system {
+  background: #020617;
+}
+
+.dark-mode .mesh-blob {
+  opacity: 0.25;
+  mix-blend-mode: lighten;
+}
+
+/* Glass Enhancement for Dashboard Containers */
+.glass-panel-ultra {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.dark-mode .glass-panel-ultra {
+  background: rgba(15, 23, 42, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}

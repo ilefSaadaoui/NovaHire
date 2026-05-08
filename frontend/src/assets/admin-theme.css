@@ -1,0 +1,364 @@
+/* 
+ * ========================================================
+ * NOVAHIRE CELESTIAL ENTERPRISE THEME (ADMIN)
+ * ========================================================
+ */
+
+:root {
+  /* Celestial Palette */
+  --a-primary: #0ea5e9; /* Sky Blue */
+  --a-primary-dark: #0369a1;
+  --a-primary-soft: rgba(14, 165, 233, 0.1);
+  --a-accent: #fcd34d; /* Premium Gold */
+  --a-accent-dark: #d97706;
+  --a-accent-soft: rgba(252, 211, 77, 0.15);
+  
+  /* Gradations */
+  --a-grad-celestial: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+  --a-grad-gold: linear-gradient(135deg, #fcd34d 0%, #d97706 100%);
+  --a-grad-surface: linear-gradient(160deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+
+  /* Luxury Tech Tokens */
+  --a-glass-border: rgba(255, 255, 255, 0.08);
+  --a-shadow-luxury: 0 15px 45px rgba(0, 0, 0, 0.12);
+}
+
+.dark-mode {
+  --a-primary-soft: rgba(14, 165, 233, 0.15);
+  --a-accent-soft: rgba(252, 211, 77, 0.15);
+  --a-glass-border: rgba(255, 255, 255, 0.12);
+  --a-grad-surface: linear-gradient(160deg, #1e293b 0%, #020617 100%);
+}
+
+.dark-mode .admin-glass-card {
+  background: var(--card-bg, #111827);
+  border-color: var(--border-thin, rgba(255, 255, 255, 0.1));
+}
+
+.dark-mode .admin-tabs-floating {
+  background: var(--card-bg, #111827);
+}
+
+/* ========================================================
+ * REUSABLE ADMIN IDENTITY TAG (Premium Badge)
+ * ======================================================== */
+.admin-identity-tag {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 100px;
+  overflow: visible;
+  transition: 0.3s;
+}
+
+.admin-identity-tag:hover {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.4);
+  transform: scale(1.02);
+}
+
+.tag-glow {
+  position: absolute;
+  top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: tag-shimmer 4s infinite;
+}
+
+@keyframes tag-shimmer {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
+}
+
+.tag-dot {
+  width: 8px;
+  height: 8px;
+  background: #0ea5e9;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #0ea5e9;
+}
+
+.tag-text {
+  font-size: 11px;
+  font-weight: 900;
+  color: #0ea5e9;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.dark-mode .admin-identity-tag {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.dark-mode .tag-text {
+  color: #38bdf8;
+}
+
+.dark-mode .tag-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 12px #38bdf8;
+}
+
+/* ========================================================
+ * IMPERIAL EFFECTS (HALOS & AURAS)
+ * ======================================================== */
+
+.imperial-aura {
+  position: relative;
+  display: inline-block;
+}
+
+.imperial-aura::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140%;
+  height: 140%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--a-accent-soft) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(20px);
+}
+
+.halo-gold {
+  box-shadow: 0 0 30px var(--a-accent-soft);
+  border: 1px solid var(--a-accent);
+}
+
+/* ========================================================
+ * PREMIUM CARDS & PANELS
+ * ======================================================== */
+
+.admin-glass-card {
+  background: white; /* Imperial Clean White */
+  border: none; /* Removed border for seamless look */
+  border-radius: 14px; /* Compact radius */
+  padding: 18px;
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.03); /* Extremely soft shadow */
+}
+
+.admin-glass-card:hover {
+  transform: translateY(-5px); /* Gentle float */
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.06);
+}
+
+.admin-card-gold-glow:hover {
+  border-color: rgba(252, 211, 77, 0.3);
+  box-shadow: 0 20px 60px rgba(217, 119, 6, 0.1);
+}
+
+/* ========================================================
+ * CELESTIAL COMPONENTS
+ * ======================================================== */
+
+.a-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--a-primary-soft);
+  color: var(--a-primary);
+  margin-bottom: 12px;
+  transition: 0.3s;
+}
+
+.admin-glass-card:hover .a-stat-icon {
+  background: var(--a-grad-celestial);
+  color: white;
+  transform: rotate(10deg) scale(1.1);
+  box-shadow: 0 10px 20px var(--a-primary-soft);
+}
+
+.a-badge-gold {
+  background: #fdf6b2; /* Lighter vivid background */
+  color: #c27803; /* Strong orange/gold text */
+  padding: 4px 12px;
+  border-radius: 10px; /* Modern pill */
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: none;
+}
+
+/* ========================================================
+ * LUXURY BUTTONS
+ * ======================================================== */
+
+.btn-luxury {
+  padding: 8px 18px;
+  border-radius: 100px;
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.btn-luxury.primary {
+  background: var(--a-grad-celestial);
+  color: white;
+  border: none;
+  box-shadow: 0 8px 20px var(--a-primary-soft);
+}
+
+.btn-luxury.primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(14, 165, 233, 0.3);
+}
+
+.btn-luxury.gold {
+  background: var(--a-grad-gold);
+  color: white;
+  border: none;
+  box-shadow: 0 8px 20px var(--a-accent-soft);
+}
+
+.btn-luxury.gold:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px var(--a-accent-soft);
+}
+
+/* ========================================================
+ * TABLE SUBLIMATION
+ * ======================================================== */
+
+.celestial-table tr {
+  transition: background 0.3s;
+}
+
+.celestial-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dark-mode .celestial-table tr:hover {
+  background: rgba(14, 165, 233, 0.03);
+}
+
+.u-email {
+  font-family: 'Inter', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: -0.2px;
+}
+
+/* ========================================================
+ * TABS & NAVIGATION
+ * ======================================================== */
+
+.admin-tabs-floating {
+  display: flex;
+  gap: 12px;
+  background: var(--card-bg, #ffffff);
+  padding: 8px;
+  border-radius: 20px;
+  border: 1px solid var(--r-border);
+  width: fit-content;
+  margin-bottom: 40px;
+  box-shadow: var(--r-shadow);
+}
+
+.admin-tab-btn {
+  padding: 12px 24px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  color: var(--r-text-sub);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.admin-tab-btn.active {
+  background: white;
+  color: var(--a-primary);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .admin-tab-btn.active {
+  background: var(--a-primary);
+  color: white;
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
+}
+
+/* ========================================================
+ * PROFILE ACCESSORIES
+ * ======================================================== */
+
+.s-icon-mini {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--a-primary-soft);
+  color: var(--a-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.s-icon-mini svg {
+  width: 18px;
+}
+
+/* ========================================================
+ * BRANDING INNOVATION
+ * ======================================================== */
+
+.lux-input-group label.imperial-label {
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  color: var(--a-primary);
+  letter-spacing: 1.5px;
+  margin-bottom: 14px;
+}
+
+.lux-color-box {
+  background: var(--a-grad-surface) !important;
+  border: 1px solid var(--a-glass-border) !important;
+  box-shadow: var(--a-shadow-luxury);
+  transition: 0.4s;
+}
+
+.lux-color-box:hover {
+  border-color: var(--a-primary);
+  transform: scale(1.02);
+}
+
+.mockup-container-lux {
+  background: radial-gradient(circle at top right, var(--a-primary-soft), transparent),
+              radial-gradient(circle at bottom left, var(--a-accent-soft), transparent) !important;
+  border: 1px solid var(--a-glass-border) !important;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.3) !important;
+}
+
+.mockup-frame {
+  box-shadow: 0 40px 80px -20px rgba(0,0,0,0.5) !important;
+}
+
+@keyframes gold-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.a-shimmer-text {
+  background: linear-gradient(90deg, #d97706, #fcd34d, #d97706);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gold-shimmer 3s infinite linear;
+}

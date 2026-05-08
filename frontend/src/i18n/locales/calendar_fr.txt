@@ -1,0 +1,8 @@
+    },
+    "calendar": {
+        "subtitle": "Planifiez et gérez vos entretiens et réunions d'équipe",
+        "schedule": "Programmer",
+        "upcoming": "Entretiens à venir",
+        "noEvents": "Aucun événement prévu"
+    }
+}

@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            background-color: #f0f0f0;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .summary-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .summary-card .count {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background-color: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #5568d3;
+        }
+
+        .btn-danger {
+            background-color: #ff6b6b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #ee5a52;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .search-box {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            width: 300px;
+            max-width: 100%;
+        }
+
+        .table-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+            color: #333;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            word-break: break-word;
+            max-width: 300px;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            margin-right: 5px;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+
+        .btn-edit {
+            background-color: #17a2b8;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background-color: #138496;
+        }
+
+        .btn-delete {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background-color: #c82333;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 25px;
+        }
+
+        .pagination {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .pagination button.active {
+            background-color: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .checkbox {
+            margin-right: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+
+            .tabs {
+                overflow-x: auto;
+            }
+
+            .tab-btn {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+
+            td {
+                max-width: 150px;
+                font-size: 12px;
+            }
+
+            .summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .text-truncate {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Database Admin Dashboard</h1>
+        <p>Manage all database tables with CRUD operations</p>
+    </div>
+
+    <div class="container">
+        <!-- Summary Section -->
+        <div id="summary" class="summary"></div>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="users">👥 Users</button>
+            <button class="tab-btn" data-tab="companies">🏢 Companies</button>
+            <button class="tab-btn" data-tab="joboffers">💼 Job Offers</button>
+            <button class="tab-btn" data-tab="jobapplications">📝 Job Applications</button>
+        </div>
+
+        <!-- USERS Tab -->
+        <div id="users" class="tab-content active">
+            <div id="usersMessage"></div>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="openUserModal()">+ Add User</button>
+                <input type="text" class="search-box" id="userSearch" placeholder="Search users...">
+                <button class="btn btn-secondary" onclick="exportTableData('Users')">📥 Export</button>
+            </div>
+            <div class="table-wrapper">
+                <table id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Active</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="usersPagination"></div>
+        </div>
+
+        <!-- COMPANIES Tab -->
+        <div id="companies" class="tab-content">
+            <div id="companiesMessage"></div>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="openCompanyModal()">+ Add Company</button>
+                <input type="text" class="search-box" id="companySearch" placeholder="Search companies...">
+                <button class="btn btn-secondary" onclick="exportTableData('Companies')">📥 Export</button>
+            </div>
+            <div class="table-wrapper">
+                <table id="companiesTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>City</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="companiesBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="companiesPagination"></div>
+        </div>
+
+        <!-- JOB OFFERS Tab -->
+        <div id="joboffers" class="tab-content">
+            <div id="joboffersMessage"></div>
+            <div class="controls">
+                <input type="text" class="search-box" id="joboofferSearch" placeholder="Search job offers...">
+                <button class="btn btn-secondary" onclick="exportTableData('JobOffers')">📥 Export</button>
+            </div>
+            <div class="table-wrapper">
+                <table id="joboffersTable">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Company</th>
+                            <th>Location</th>
+                            <th>Salary</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="joboffersBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="joboffersPagination"></div>
+        </div>
+
+        <!-- JOB APPLICATIONS Tab -->
+        <div id="jobapplications" class="tab-content">
+            <div id="jobapplicationsMessage"></div>
+            <div class="controls">
+                <input type="text" class="search-box" id="jobapplicationSearch" placeholder="Search applications...">
+                <button class="btn btn-secondary" onclick="exportTableData('JobApplications')">📥 Export</button>
+            </div>
+            <div class="table-wrapper">
+                <table id="jobapplicationsTable">
+                    <thead>
+                        <tr>
+                            <th>Job Title</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobapplicationsBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="jobapplicationsPagination"></div>
+        </div>
+    </div>
+
+    <!-- User Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="userModalTitle">Add User</h2>
+                <button class="close-btn" onclick="closeUserModal()">&times;</button>
+            </div>
+            <form id="userForm" onsubmit="submitUserForm(event)">
+                <div class="form-group">
+                    <label>First Name *</label>
+                    <input type="text" id="userFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label>Last Name *</label>
+                    <input type="text" id="userLastName" required>
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" id="userEmail" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="userPassword" placeholder="Leave blank to auto-generate">
+                </div>
+                <div class="form-group">
+                    <label>Role *</label>
+                    <select id="userRole" required>
+                        <option value="">Select Role</option>
+                        <option value="0">Candidate</option>
+                        <option value="1">Recruiter</option>
+                        <option value="2">CompanyAdmin</option>
+                        <option value="3">SuperAdmin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Active</label>
+                    <input type="checkbox" id="userActive" checked>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Company Modal -->
+    <div id="companyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="companyModalTitle">Add Company</h2>
+                <button class="close-btn" onclick="closeCompanyModal()">&times;</button>
+            </div>
+            <form id="companyForm" onsubmit="submitCompanyForm(event)">
+                <div class="form-group">
+                    <label>Name *</label>
+                    <input type="text" id="companyName" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="companyDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Contact Email</label>
+                    <input type="email" id="companyContactEmail">
+                </div>
+                <div class="form-group">
+                    <label>Contact Phone</label>
+                    <input type="tel" id="companyContactPhone">
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" id="companyAddress">
+                </div>
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" id="companyCity">
+                </div>
+                <div class="form-group">
+                    <label>Postal Code</label>
+                    <input type="text" id="companyPostalCode">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" id="companyCountry">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCompanyModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Company</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/admin';
+        let currentPage = 1;
+        const pageSize = 50;
+        let editingUserId = null;
+        let editingCompanyId = null;
+        let allUsers = [];
+        let allCompanies = [];
+        let allJobOffers = [];
+        let allJobApplications = [];
+
+        // Get JWT token from localStorage, sessionStorage, or URL parameter
+        function getAuthToken() {
+            // Check URL query parameter first
+            const urlParams = new URLSearchParams(window.location.search);
+            const tokenParam = urlParams.get('token');
+            if (tokenParam) {
+                localStorage.setItem('accessToken', tokenParam);
+                return tokenParam;
+            }
+            
+            // Check localStorage/sessionStorage
+            return localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+        }
+
+        // Add token to request headers
+        function getHeaders() {
+            const token = getAuthToken();
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            return headers;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupTabNavigation();
+            
+            const token = getAuthToken();
+            if (!token) {
+                // Show a helpful message with instructions
+                const messageHtml = `
+                    <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                        <h3 style="margin-top: 0; color: #856404;">⚠️ Authentication Required</h3>
+                        <p style="color: #856404;">You can access this dashboard in two ways:</p>
+                        <ol style="color: #856404;">
+                            <li><strong>During Development:</strong> Comment out the [Authorize] attribute in AdminController.cs</li>
+                            <li><strong>In Production:</strong> Get your JWT token:
+                                <ul>
+                                    <li>Login via your main application</li>
+                                    <li>Copy the accessToken from localStorage</li>
+                                    <li>Visit: <code>http://localhost:5284/admin?token=YOUR_TOKEN_HERE</code></li>
+                                </ul>
+                            </li>
+                        </ol>
+                    </div>
+                `;
+                document.getElementById('summary').innerHTML = messageHtml;
+                return;
+            }
+            
+            loadSummary();
+            loadUsers();
+        });
+
+        // Tab Navigation
+        function setupTabNavigation() {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const tabName = e.target.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabName === 'users') loadUsers();
+            else if (tabName === 'companies') loadCompanies();
+            else if (tabName === 'joboffers') loadJobOffers();
+            else if (tabName === 'jobapplications') loadJobApplications();
+        }
+
+        // Load Summary
+        async function loadSummary() {
+            try {
+                const response = await fetch(`${API_BASE}/summary`);
+                if (!response.ok) throw new Error('Failed to load summary');
+                
+                const data = await response.json();
+                const summaryHtml = `
+                    <div class="summary-card">
+                        <h3>Total Users</h3>
+                        <div class="count">${data.totalUsers}</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Total Companies</h3>
+                        <div class="count">${data.totalCompanies}</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Total Job Offers</h3>
+                        <div class="count">${data.totalJobOffers}</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Total Applications</h3>
+                        <div class="count">${data.totalJobApplications}</div>
+                    </div>
+                `;
+                document.getElementById('summary').innerHTML = summaryHtml;
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        // ==================== USERS ====================
+        async function loadUsers(page = 1) {
+            try {
+                const response = await fetch(`${API_BASE}/users?pageNumber=${page}&pageSize=${pageSize}`, {
+                    method: 'GET',
+                    headers: getHeaders()
+                });
+                if (!response.ok) throw new Error('Failed to load users');
+                
+                const data = await response.json();
+                allUsers = data.data;
+                displayUsers(data.data);
+                renderPagination('usersPagination', page, Math.ceil(data.total / pageSize), loadUsers);
+            } catch (error) {
+                showMessage('usersMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersBody');
+            if (!users.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="no-data">No users found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>${user.firstName}</td>
+                    <td>${user.lastName}</td>
+                    <td class="text-truncate">${user.email}</td>
+                    <td>${getRoleName(user.role)}</td>
+                    <td>${user.isActive ? '✓' : '✗'}</td>
+                    <td>${new Date(user.createdAt).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn action-btn btn-edit" onclick="editUser('${user.id}')">Edit</button>
+                        <button class="btn action-btn btn-delete" onclick="deleteUser('${user.id}')">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getRoleName(role) {
+            const roles = { 0: 'Candidate', 1: 'Recruiter', 2: 'CompanyAdmin', 3: 'SuperAdmin' };
+            return roles[role] || 'Unknown';
+        }
+
+        function openUserModal() {
+            editingUserId = null;
+            document.getElementById('userForm').reset();
+            document.getElementById('userModalTitle').textContent = 'Add User';
+            document.getElementById('userModal').classList.add('show');
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').classList.remove('show');
+        }
+
+        async function submitUserForm(event) {
+            event.preventDefault();
+            
+            const userData = {
+                firstName: document.getElementById('userFirstName').value,
+                lastName: document.getElementById('userLastName').value,
+                email: document.getElementById('userEmail').value,
+                password: document.getElementById('userPassword').value,
+                role: parseInt(document.getElementById('userRole').value),
+                isActive: document.getElementById('userActive').checked
+            };
+
+            try {
+                const method = editingUserId ? 'PUT' : 'POST';
+                const url = editingUserId ? `${API_BASE}/users/${editingUserId}` : `${API_BASE}/users`;
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                if (!response.ok) throw new Error('Failed to save user');
+                
+                closeUserModal();
+                loadUsers();
+                showMessage('usersMessage', `User ${editingUserId ? 'updated' : 'created'} successfully!`, 'success');
+            } catch (error) {
+                showMessage('usersMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function editUser(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/users/${userId}`);
+                if (!response.ok) throw new Error('Failed to load user');
+                
+                const user = await response.json();
+                editingUserId = userId;
+                document.getElementById('userFirstName').value = user.firstName;
+                document.getElementById('userLastName').value = user.lastName;
+                document.getElementById('userEmail').value = user.email;
+                document.getElementById('userRole').value = user.role;
+                document.getElementById('userActive').checked = user.isActive;
+                document.getElementById('userModalTitle').textContent = 'Edit User';
+                document.getElementById('userModal').classList.add('show');
+            } catch (error) {
+                showMessage('usersMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('Are you sure you want to delete this user?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/users/${userId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to delete user');
+                
+                loadUsers();
+                showMessage('usersMessage', 'User deleted successfully!', 'success');
+            } catch (error) {
+                showMessage('usersMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // ==================== COMPANIES ====================
+        async function loadCompanies(page = 1) {
+            try {
+                const response = await fetch(`${API_BASE}/companies?pageNumber=${page}&pageSize=${pageSize}`);
+                if (!response.ok) throw new Error('Failed to load companies');
+                
+                const data = await response.json();
+                allCompanies = data.data;
+                displayCompanies(data.data);
+                renderPagination('companiesPagination', page, Math.ceil(data.total / pageSize), loadCompanies);
+            } catch (error) {
+                showMessage('companiesMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function displayCompanies(companies) {
+            const tbody = document.getElementById('companiesBody');
+            if (!companies.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No companies found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = companies.map(company => `
+                <tr>
+                    <td class="text-truncate">${company.name}</td>
+                    <td class="text-truncate">${company.contactEmail || '-'}</td>
+                    <td>${company.contactPhone || '-'}</td>
+                    <td>${company.city || '-'}</td>
+                    <td>${new Date(company.createdAt).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn action-btn btn-edit" onclick="editCompany('${company.id}')">Edit</button>
+                        <button class="btn action-btn btn-delete" onclick="deleteCompany('${company.id}')">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function openCompanyModal() {
+            editingCompanyId = null;
+            document.getElementById('companyForm').reset();
+            document.getElementById('companyModalTitle').textContent = 'Add Company';
+            document.getElementById('companyModal').classList.add('show');
+        }
+
+        function closeCompanyModal() {
+            document.getElementById('companyModal').classList.remove('show');
+        }
+
+        async function submitCompanyForm(event) {
+            event.preventDefault();
+            
+            const companyData = {
+                name: document.getElementById('companyName').value,
+                description: document.getElementById('companyDescription').value,
+                contactEmail: document.getElementById('companyContactEmail').value,
+                contactPhone: document.getElementById('companyContactPhone').value,
+                address: document.getElementById('companyAddress').value,
+                city: document.getElementById('companyCity').value,
+                postalCode: document.getElementById('companyPostalCode').value,
+                country: document.getElementById('companyCountry').value
+            };
+
+            try {
+                const method = editingCompanyId ? 'PUT' : 'POST';
+                const url = editingCompanyId ? `${API_BASE}/companies/${editingCompanyId}` : `${API_BASE}/companies`;
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(companyData)
+                });
+
+                if (!response.ok) throw new Error('Failed to save company');
+                
+                closeCompanyModal();
+                loadCompanies();
+                showMessage('companiesMessage', `Company ${editingCompanyId ? 'updated' : 'created'} successfully!`, 'success');
+            } catch (error) {
+                showMessage('companiesMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function editCompany(companyId) {
+            try {
+                const response = await fetch(`${API_BASE}/companies/${companyId}`);
+                if (!response.ok) throw new Error('Failed to load company');
+                
+                const company = await response.json();
+                editingCompanyId = companyId;
+                document.getElementById('companyName').value = company.name;
+                document.getElementById('companyDescription').value = company.description || '';
+                document.getElementById('companyContactEmail').value = company.contactEmail || '';
+                document.getElementById('companyContactPhone').value = company.contactPhone || '';
+                document.getElementById('companyAddress').value = company.address || '';
+                document.getElementById('companyCity').value = company.city || '';
+                document.getElementById('companyPostalCode').value = company.postalCode || '';
+                document.getElementById('companyCountry').value = company.country || '';
+                document.getElementById('companyModalTitle').textContent = 'Edit Company';
+                document.getElementById('companyModal').classList.add('show');
+            } catch (error) {
+                showMessage('companiesMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteCompany(companyId) {
+            if (!confirm('Are you sure you want to delete this company?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/companies/${companyId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to delete company');
+                
+                loadCompanies();
+                showMessage('companiesMessage', 'Company deleted successfully!', 'success');
+            } catch (error) {
+                showMessage('companiesMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // ==================== JOB OFFERS ====================
+        async function loadJobOffers(page = 1) {
+            try {
+                const response = await fetch(`${API_BASE}/joboffers?pageNumber=${page}&pageSize=${pageSize}`);
+                if (!response.ok) throw new Error('Failed to load job offers');
+                
+                const data = await response.json();
+                allJobOffers = data.data;
+                displayJobOffers(data.data);
+                renderPagination('joboffersPagination', page, Math.ceil(data.total / pageSize), loadJobOffers);
+            } catch (error) {
+                showMessage('joboffersMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function displayJobOffers(offers) {
+            const tbody = document.getElementById('joboffersBody');
+            if (!offers.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">No job offers found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = offers.map(offer => `
+                <tr>
+                    <td class="text-truncate">${offer.title}</td>
+                    <td class="text-truncate">${offer.company?.name || '-'}</td>
+                    <td>${offer.location || '-'}</td>
+                    <td>${offer.salaryRange || '-'}</td>
+                    <td>${new Date(offer.createdAt).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn action-btn btn-delete" onclick="deleteJobOffer('${offer.id}')">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function deleteJobOffer(offerId) {
+            if (!confirm('Are you sure you want to delete this job offer?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/joboffers/${offerId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to delete job offer');
+                
+                loadJobOffers();
+                showMessage('joboffersMessage', 'Job offer deleted successfully!', 'success');
+            } catch (error) {
+                showMessage('joboffersMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // ==================== JOB APPLICATIONS ====================
+        async function loadJobApplications(page = 1) {
+            try {
+                const response = await fetch(`${API_BASE}/jobapplications?pageNumber=${page}&pageSize=${pageSize}`);
+                if (!response.ok) throw new Error('Failed to load job applications');
+                
+                const data = await response.json();
+                allJobApplications = data.data;
+                displayJobApplications(data.data);
+                renderPagination('jobapplicationsPagination', page, Math.ceil(data.total / pageSize), loadJobApplications);
+            } catch (error) {
+                showMessage('jobapplicationsMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function displayJobApplications(applications) {
+            const tbody = document.getElementById('jobapplicationsBody');
+            if (!applications.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-data">No applications found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = applications.map(app => `
+                <tr>
+                    <td class="text-truncate">${app.jobOffer?.title || '-'}</td>
+                    <td>${app.status || '-'}</td>
+                    <td>${new Date(app.createdAt).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn action-btn btn-delete" onclick="deleteJobApplication('${app.id}')">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function deleteJobApplication(appId) {
+            if (!confirm('Are you sure you want to delete this application?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/jobapplications/${appId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to delete application');
+                
+                loadJobApplications();
+                showMessage('jobapplicationsMessage', 'Application deleted successfully!', 'success');
+            } catch (error) {
+                showMessage('jobapplicationsMessage', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // ==================== UTILITIES ====================
+        function showMessage(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.className = type;
+            element.innerHTML = message;
+            setTimeout(() => {
+                element.innerHTML = '';
+            }, 5000);
+        }
+
+        function renderPagination(elementId, currentPage, totalPages, callback) {
+            const pagination = document.getElementById(elementId);
+            let html = '';
+
+            if (currentPage > 1) {
+                html += `<button onclick="${callback.name}(${currentPage - 1})">← Previous</button>`;
+            }
+
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+                html += `<button ${i === currentPage ? 'class="active"' : ''} onclick="${callback.name}(${i})">${i}</button>`;
+            }
+
+            if (currentPage < totalPages) {
+                html += `<button onclick="${callback.name}(${currentPage + 1})">Next →</button>`;
+            }
+
+            pagination.innerHTML = html;
+        }
+
+        function exportTableData(tableName) {
+            let data, filename;
+            
+            if (tableName === 'Users') {
+                data = allUsers;
+                filename = 'users.json';
+            } else if (tableName === 'Companies') {
+                data = allCompanies;
+                filename = 'companies.json';
+            } else if (tableName === 'JobOffers') {
+                data = allJobOffers;
+                filename = 'jooffers.json';
+            } else if (tableName === 'JobApplications') {
+                data = allJobApplications;
+                filename = 'applications.json';
+            }
+
+            const dataStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+        }
+
+        // Close modals on escape key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeUserModal();
+                closeCompanyModal();
+            }
+        });
+
+        // Close modals on outside click
+        window.addEventListener('click', (e) => {
+            if (e.target.id === 'userModal') closeUserModal();
+            if (e.target.id === 'companyModal') closeCompanyModal();
+        });
+    </script>
+</body>
+</html>

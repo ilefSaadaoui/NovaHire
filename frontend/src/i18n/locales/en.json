@@ -1,0 +1,520 @@
+{
+    "common": {
+        "dashboard": "Dashboard",
+        "offers": "Offers",
+        "pipeline": "Candidates",
+        "reports": "Reports",
+        "team": "Settings",
+        "settings": "Company's settings",
+        "profile": "Profile",
+        "logout": "Logout",
+        "language": "Application Language",
+        "save": "Save Changes",
+        "reset": "Reset",
+        "themeLight": "Light Mode",
+        "themeDark": "Dark Mode",
+        "userPlaceholder": "User",
+        "search": "Search...",
+        "noResults": "No results",
+        "new": "New",
+        "exporting": "Exporting...",
+        "locale_tag": "en-GB"
+    },
+    "profile": {
+        "verified": "Account Verified",
+        "title": "Experience Profile",
+        "subtitle": "Manage your information and security preferences",
+        "downloadPDF": "Download Report",
+        "info": "My Account",
+        "securityTab": "Security & Access",
+        "personalInfo": "Personal Information",
+        "interfaceSettings": "Interface Settings",
+        "fullName": "Full Name",
+        "email": "Professional Email",
+        "phone": "Phone Number",
+        "department": "Department / Team",
+        "security": {
+            "title": "Change Password",
+            "subtitle": "Use a strong password with at least 8 characters",
+            "current": "Current Password",
+            "new": "New Password",
+            "confirm": "Confirm New Password",
+            "changeBtn": "Change Password",
+            "cancel": "Cancel"
+        },
+        "stats": {
+            "tenure": "Tenure",
+            "activity": "Activity"
+        },
+        "placeholders": {
+            "fullName": "Your full name",
+            "phone": "Phone number",
+            "notSet": "Not set",
+            "currentPassword": "Current password",
+            "newPassword": "New password",
+            "confirmPassword": "Confirm password"
+        },
+        "departments": {
+            "talent": "Talent Acquisition",
+            "hr": "HR Management",
+            "engineering": "Engineering Recruitment",
+            "executive": "Executive Search"
+        },
+        "updating": "Updating...",
+        "validation": {
+            "required": "Field required",
+            "lettersOnly": "Letters only",
+            "invalidPhone": "Invalid number",
+            "minChar": "8 chars min",
+            "upperCaseRequired": "Uppercase required",
+            "digitRequired": "Digit required",
+            "notIdentical": "Not identical"
+        },
+        "interviewGuideTab": "Interview Guide",
+        "guideTitle": "Strategic Interview Guide",
+        "guideSub": "AI-generated personalized questions to validate the candidate's skills and potential.",
+        "guideEmpty": "Guide not available",
+        "guidePending": "Re-run the AI analysis to generate your personalized interview guide.",
+        "cvTitle": "CV Extracts",
+        "motivationTitle": "Motivation",
+        "historyTitle": "History",
+        "commentsTitle": "Comments",
+        "liveMode": "Live Interview Mode",
+        "scoreLabel": "Rating",
+        "notesLabel": "Interview Notes",
+        "saveGuide": "Save Evaluation",
+        "editQuestion": "Edit Question",
+        "addQuestion": "Add Question"
+    },
+    "roles": {
+        "admin": "Administrator",
+        "recruiter": "Recruiter"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "subtitle": "Welcome to your NovaHire recruitment space",
+        "loading": "Loading your analytics...",
+        "error": "Failed to load dashboard data",
+        "seeAll": "See all",
+        "candidates": "Candidates",
+        "stats": {
+            "activeOffers": "Active Offers",
+            "vsLastMonth": "vs last month",
+            "receivedApps": "Applications received",
+            "constantFlow": "Constant Flow",
+            "aiAnalyses": "AI Analyses",
+            "stableQuality": "Stable quality",
+            "plannedInterviews": "Planned Interviews",
+            "thisWeek": "This week"
+        },
+        "pipeline": {
+            "title": "Candidate Management",
+            "iaRealTime": "Real-time AI Analysis"
+        },
+        "recentAI": {
+            "title": "Recent AI Analyses"
+        },
+        "activeOffers": {
+            "title": "Active Job Offers",
+            "manage": "Manage offers",
+            "empty": "No active offers at the moment."
+        },
+        "topProfiles": {
+            "title": "Top Profiles",
+            "score": "Score > 85%"
+        },
+        "admin": {
+            "welcome": "Company Dashboard",
+            "subtitle": "Global statistics and team performance",
+            "activeOffers": "Active Offers (Global)",
+            "totalApps": "Total Applications",
+            "interviews": "Company Interviews",
+            "aiAnalyses": "Global AI Analyses",
+            "hiringFlow": "Global Hiring Flow",
+            "teamActivity": "Team Activity",
+            "recentOffers": "Latest Job Offers",
+            "recentActivity": "Recent Company Activity",
+            "companyEngagement": "Candidate Engagement (Global)",
+            "health": "Platform Health",
+            "supervision": "Team Supervision",
+            "operational": "Operational",
+            "offline": "Offline",
+            "commandCenterSubtitle": "Behold your organization's command center.",
+            "velocity": "Average Velocity",
+            "aiEfficiency": "AI Efficiency",
+            "funnelTitle": "Control Tower - Global Funnel",
+            "funnelSubtitle": "Strategic conversion flow",
+            "empireFlow": "Empire Flow",
+            "deptStrength": "Strength by Department",
+            "teamPerformance": "Top Team Performance",
+            "flagshipOffers": "Flagship Offers"
+        },
+        "recruiter": {
+            "welcomeMorning": "Good morning, {name}",
+            "welcomeAfternoon": "Good afternoon, {name}",
+            "welcomeEvening": "Good evening, {name}",
+            "subtitle": "Your personal recruitment activity",
+            "myActiveOffers": "My Active Offers",
+            "totalApplications": "Total Applications",
+            "plannedInterviews": "Planned Interviews",
+            "statusBreakdown": "Status Breakdown",
+            "recruitmentActivity": "Recruitment Activity",
+            "newApps": "new apps",
+            "processed": "processed",
+            "applicationsTrend": "Applications Trend",
+            "aiScored": "AI Scored",
+            "active": "Active",
+            "recruitmentFunnel": "Recruitment Funnel",
+            "recentOffers": "Recent Offers",
+            "recentActivities": "Recent Activities",
+            "applicationFlow": "Application Flow",
+            "appsCount": "{count} apps",
+            "matchScore": "{score}% match",
+            "vsPreviousPeriod": "vs previous period",
+            "upcomingInterviews": "Upcoming",
+            "scheduledUpcoming": "Scheduled ahead",
+            "matchingTrends": "Matching Trends",
+            "analysisRate": "Analysis Rate",
+            "processingRate": "Processing Rate",
+            "qualityDistribution": "Quality Distribution (AI)",
+            "topSkills": "Most Requested Skills",
+            "awaitingAiAnalyses": "Awaiting AI analyses...",
+            "peopleCount": "{count} people",
+            "noRecentOffers": "No recent offers",
+            "noRecentActivities": "No recent activities",
+            "applicationReceived": "Application received",
+            "received": "Received",
+            "days": {
+                "mon": "Mon",
+                "tue": "Tue",
+                "wed": "Wed",
+                "thu": "Thu",
+                "fri": "Fri",
+                "sat": "Sat",
+                "sun": "Sun"
+            }
+        },
+        "lastMonth": "last month",
+        "search": "Search...",
+        "company": {
+            "title": "Corporate Supervision",
+            "stats": "Global Metrics",
+            "teamPerformance": "Team Performance",
+            "hiringSpeed": "Hiring Speed"
+        }
+    },
+    "offers": {
+        "title": "Job Offers",
+        "subtitle": "{count} active offer(s) found",
+        "new": "New Offer",
+        "searchPlaceholder": "Search by title, city...",
+        "allStatus": "All Statuses",
+        "allTypes": "All Types",
+        "loading": "Loading offers...",
+        "noResult": "No results found",
+        "noResultSub": "Adjust your filters to find what you are looking for.",
+        "copied": "Link copied to clipboard.",
+        "status": {
+            "active": "Active",
+            "paused": "Paused",
+            "closed": "Closed",
+            "draft": "Draft"
+        },
+        "table": {
+            "position": "Position & Department",
+            "location": "Location",
+            "contract": "Contract",
+            "candidates": "Candidates",
+            "date": "Date",
+            "status": "Status",
+            "actions": "Actions"
+        },
+        "deleted": "Offer deleted successfully.",
+        "actions": {
+            "share": "Share",
+            "delete": "Delete",
+            "details": "Details",
+            "edit": "Edit",
+            "publish": "Publish",
+            "copyLink": "Copy Link"
+        },
+        "types": {
+            "fullTime": "Full-Time (CDI)",
+            "contract": "Contract (CDD)",
+            "internship": "Internship / Apprenticeship",
+            "freelance": "Freelance / Independent"
+        },
+        "experience": {
+            "all": "All",
+            "beginner": "Beginner (0-1 year)",
+            "junior": "Junior (1-3 years)",
+            "intermediate": "Intermediate (3-5 years)",
+            "senior": "Senior (5-10 years)",
+            "expert": "Expert / Lead (10+ years)"
+        }
+    },
+    "pipeline": {
+        "selectOffer": "Choose an offer...",
+        "selectOfferPrompt": "Select an offer",
+        "selectOfferSub": "Please choose a job offer to visualize the corresponding applications.",
+        "title": "Candidate Management",
+        "subtitle": "{count} candidate(s) · {offer}",
+        "view": {
+            "kanban": "Kanban View",
+            "list": "List View"
+        },
+        "ai": {
+            "groupAnalysis": "Bulk AI Analysis"
+        },
+        "loading": "Syncing pipeline...",
+        "empty": "No candidates",
+        "emptySub": "The pipeline for this offer is currently empty.",
+        "table": {
+            "candidate": "Candidate",
+            "score": "AI Score",
+            "skills": "Key Skills",
+            "stage": "Status",
+            "date": "Date",
+            "action": "Action"
+        },
+        "modal": {
+            "title": "Intensive AI Processing",
+            "sub": "CV analysis and scoring in progress...",
+            "profiles": "profiles",
+            "results": "View Results"
+        },
+        "timeline": {
+            "received": "Application Received",
+            "receivedSub": "Application recorded in the system.",
+            "interviewScheduled": "Interview Scheduled",
+            "interviewScheduledSub": "Interview scheduled.",
+            "visioSub": "Video interview."
+        },
+        "interview": {
+            "email": {
+                "subject": "Interview Invitation for the position: {job}",
+                "body": "Hello {name},\n\nFollowing the review of your application for the position of {job}, we are pleased to inform you that your profile has caught our full attention.\n\nWe would like to meet you {type} to discuss your background and motivations.{details}\n\nPlease confirm your availability by replying to this email.\n\nBest regards",
+                "visioDetails": "\n\nHere is the link to join the meeting:\n[Insert your Google Meet / Zoom / Teams link here]",
+                "phoneDetails": "\n\nWe will contact you at the number you provided. Please ensure you are available at the indicated time.",
+                "onsiteDetails": "\n\nAddress:\n[Insert the full address of your offices here]\n\nPlease arrive at the reception 10 minutes before the scheduled time."
+            },
+            "types": {
+                "visio": "via video conference",
+                "phone": "by phone",
+                "onsite": "at our premises"
+            }
+        }
+    },
+    "stages": {
+        "new": "New",
+        "analyzed": "Analyzed",
+        "preselected": "Preselected",
+        "interview": "Interview",
+        "rejected": "Rejected"
+    },
+    "reports": {
+        "title": "Strategy & Talent Intelligence",
+        "subtitle": "Advanced analytics of your recruitment flows",
+        "exportPdf": "EXECUTIVE PDF",
+        "exportExcel": "RAW DATA",
+        "selectMission": "Select a mission",
+        "noMission": "No file selected",
+        "noMissionSub": "Please choose a job offer to visualize detailed activity reports.",
+        "preparingDashboard": "Preparing your recruitment dashboards...",
+        "dossierBadge": "Confidential • Analysis Dossier",
+        "generatingDossier": "Generating strategic dossier...",
+        "strategicSummary": "Strategic Summary",
+        "summaryText": "The <strong>{jobTitle}</strong> offer shows exceptional traction with an application volume above the industry average.",
+        "conversionRate": "Conversion Rate",
+        "matchQuality": "AI Match Quality",
+        "hiringSpeed": "Recruitment Speed",
+        "aiAnalysisText": "The ad is particularly well-calibrated. We recommend doubling sourcing efforts on LinkedIn this month to capture the missing 5% of expert profiles.",
+        "pipelineVelocity": "Pipeline Velocity",
+        "skillsHeatmap": "Skills Heatmap",
+        "required": "Required",
+        "present": "Present",
+        "topTalents": "Top 3 Elite Talents",
+        "viewAllVivier": "View entire pool",
+        "sourcingRoi": "Sourcing Efficiency (ROI)",
+        "generatedOn": "Generated on {date} by NovaHire Intelligence"
+    },
+    "settings": {
+        "title": "Administration Space",
+        "subtitle": "Control your team structure and refine your employer identity",
+        "adminMode": "Company Administrator Mode",
+        "team": {
+            "title": "Team Management",
+            "subtitle": "Manage access and roles for your collaborators",
+            "addMember": "Invite member",
+            "invite": "Invite member",
+            "roles": "Roles & Permissions",
+            "status": "Connection Status",
+            "member": "Member",
+            "actions": "Actions",
+            "operational": "Operational",
+            "offline": "Offline",
+            "revoke": "Revoke"
+        },
+        "branding": {
+            "title": "Branding & Identity",
+            "subtitle": "Personalize the visual experience of your portal",
+            "colors": "Signature Colors",
+            "logo": "Company Logo",
+            "preview": "Interface Preview",
+            "companyName": "Company Name",
+            "description": "Description",
+            "industry": "Industry",
+            "website": "Website",
+            "country": "Country",
+            "phone": "Contact Phone",
+            "apply": "Apply",
+            "syncing": "Syncing..."
+        },
+        "departments": {
+            "title": "Departments",
+            "subtitle": "Manage your company's organizational structure",
+            "new": "New",
+            "name": "Name",
+            "description": "Description",
+            "members": "Members",
+            "createdAt": "Creation Date",
+            "empty": "No departments created.",
+            "edit": "Edit Department",
+            "cancel": "Cancel",
+            "update": "Update",
+            "create": "Create Department",
+            "placeholders": {
+                "name": "E.g.: Human Resources",
+                "desc": "Optional..."
+            }
+        },
+        "subscription": {
+            "title": "Manage Subscription",
+            "subtitle": "Adjust your plan to unlock more features",
+            "upgrade": "Upgrade Plan",
+            "processing": "Processing...",
+            "plans": {
+                "free": {
+                    "name": "Free Experience",
+                    "desc": "Discovery & Trial"
+                },
+                "starter": {
+                    "name": "Starter",
+                    "desc": "Ideal for small teams"
+                },
+                "professional": {
+                    "name": "Professional",
+                    "desc": "Advanced AI & Collaboration"
+                },
+                "enterprise": {
+                    "name": "Elite Suite",
+                    "desc": "Custom MEA Solution"
+                }
+            },
+            "free": "FREE",
+            "perMonth": "/M"
+        },
+        "invite": {
+            "title": "Invite a Recruiter",
+            "subtitle": "Send an official invitation to join your NovaHire team.",
+            "firstName": "First Name",
+            "lastName": "Last Name",
+            "email": "Professional Email",
+            "department": "Department (Optional)",
+            "noDept": "-- No department --",
+            "cancel": "Cancel",
+            "sending": "Sending...",
+            "send": "Send Invitation"
+        },
+        "editMember": {
+            "title": "Edit Member",
+            "subtitle": "Update team member information.",
+            "save": "Save Changes",
+            "saving": "Saving..."
+        }
+    },
+    "createOffer": {
+        "title": "Create an offer",
+        "editTitle": "Edit offer",
+        "subtitle": "Define the details of your future ad",
+        "step1": "Identity",
+        "step2": "Profile",
+        "step3": "Publication",
+        "general": {
+            "step1Title": "Step 1: Job Identity",
+            "basicDetails": "Basic Details",
+            "jobTitle": "Job Title",
+            "department": "Department",
+            "deptName": "Department Name",
+            "contractType": "Contract Type",
+            "location": "Location",
+            "remote": "Remote Policy",
+            "remoteOptions": {
+                "office": "On-site",
+                "hybrid": "Hybrid",
+                "remote": "Full Remote"
+            }
+        },
+        "profile": {
+            "step2Title": "Step 2: Profile & Content",
+            "missions": "Missions & Description",
+            "skills": "Skills",
+            "addSkill": "Add a skill",
+            "experience": "Experience & Salary",
+            "expRequired": "Required Experience",
+            "salary": "Salary (Annual Gross)",
+            "salaryMin": "Min Salary",
+            "salaryMax": "Max Salary",
+            "salaryConfidential": "Confidential Salary"
+        },
+        "publish": {
+            "step3Title": "Step 3: Candidates & Workflow",
+            "aiWeights": "AI Matching Criteria",
+            "aiHint": "Indicate the importance of each criterion for the match score calculation (Total 100%).",
+            "weightExp": "Experience & Path",
+            "weightEdu": "Education & Degrees",
+            "weightSkills": "Skills & Tech Stack",
+            "workflow": "Workflow & Publication",
+            "deadline": "Deadline",
+            "action": "Action",
+            "publishNow": "Publish Immediately",
+            "saveDraft": "Keep in Draft",
+            "successTitle": "Congratulations!",
+            "successSub": "Your offer is now live and ready to receive talent.",
+            "shareLabel": "Public share link",
+            "copy": "Copy",
+            "back": "Back to offers"
+        },
+        "navigation": {
+            "prev": "Previous",
+            "next": "Next",
+            "save": "Save",
+            "publish": "Publish Offer",
+            "saveDraft": "Save Draft"
+        }
+    },
+    "notifications": {
+        "profileUpdate": "Your profile has been updated successfully ✨",
+        "updateError": "An error occurred during update.",
+        "avatarUpdate": "Profile photo updated successfully 📸",
+        "avatarError": "Error uploading photo.",
+        "passwordUpdate": "Your password has been changed successfully 🔒",
+        "passwordError": "Error changing password.",
+        "accessDeleted": "Access removed from team",
+        "brandingSaved": "Visual identity saved",
+        "notesSaved": "Notes saved successfully",
+        "candidateRejected": "Candidate rejected successfully",
+        "interviewScheduled": "Interview invitation sent",
+        "cvDownloaded": "CV download started",
+        "reportGenerating": "Generating {format} report...",
+        "roleUpdated": "Member role updated",
+        "memberRemoved": "Member removed from organization",
+        "inviteSent": "Invitation sent successfully! 🚀",
+        "updateSuccess": "Update successful!",
+        "deleteSuccess": "Deleted successfully.",
+        "copySuccess": "Link copied to clipboard.",
+        "commentAdded": "Comment added",
+        "noCV": "No CV available.",
+        "testCV": "Test candidate. No real CV."
+    }
+}
