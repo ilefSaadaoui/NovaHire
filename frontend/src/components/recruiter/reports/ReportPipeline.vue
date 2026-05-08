@@ -11,11 +11,19 @@
     <div class="pipeline-visual-v2">
       <div v-for="(step, idx) in pipelineData" :key="step.name" class="p-row">
         <div class="p-info">
-          <span class="p-name">{{ formatStepName(step.name) }}</span>
+          <div class="p-name-with-icon">
+            <component :is="getStepIcon(step.name)" :size="14" class="step-mini-icon" :style="{ color: getStepColor(step.name) }" />
+            <span class="p-name">{{ formatStepName(step.name) }}</span>
+          </div>
           <span class="p-count">{{ step.count }}</span>
         </div>
         <div class="p-bar-track">
-          <div class="p-bar-fill" :style="{ width: calculateWidth(step.count), background: getStepColor(step.name), '--delay': (idx * 0.05) + 's' }">
+          <div class="p-bar-fill" :style="{ 
+            width: calculateWidth(step.count), 
+            background: `linear-gradient(90deg, ${getStepColor(step.name)} 0%, ${getStepColor(step.name)}88 100%)`, 
+            '--delay': (idx * 0.05) + 's',
+            boxShadow: `0 0 10px ${getStepColor(step.name)}44`
+          }">
             <div class="p-shine"></div>
           </div>
         </div>
@@ -25,7 +33,17 @@
 </template>
 
 <script setup>
-import { TrendingUp } from 'lucide-vue-next'
+import { 
+  TrendingUp, 
+  UserPlus, 
+  Search, 
+  UserCheck, 
+  Mic2, 
+  XCircle, 
+  CheckCircle2, 
+  ClipboardCheck,
+  Send
+} from 'lucide-vue-next'
 
 const props = defineProps({
   pipelineData: Array
@@ -38,23 +56,39 @@ const formatStepName = (name) => {
     'Shortlisted': 'Shortlisté',
     'Interview': 'Entretien Hub',
     'Interviewed': 'Post-Entretien',
-    'Rejected': 'Résilié',
-    'Accepted': 'Intégration'
+    'Rejected': 'Refusé',
+    'Accepted': 'Recruté',
+    'OfferSent': 'Offre Envoyée'
   }
   return map[name] || name
 }
 
+const getStepIcon = (name) => {
+  const map = {
+    'Submitted': UserPlus,
+    'UnderReview': Search,
+    'Shortlisted': UserCheck,
+    'Interview': Mic2,
+    'Interviewed': ClipboardCheck,
+    'Rejected': XCircle,
+    'Accepted': CheckCircle2,
+    'OfferSent': Send
+  }
+  return map[name] || UserPlus
+}
+
 const getStepColor = (name) => {
   const map = {
-    'Submitted': 'var(--r-text-sub)',
+    'Submitted': '#94a3b8',
     'UnderReview': '#f59e0b',
     'Shortlisted': '#0ea5e9',
-    'Interview': 'var(--accent)',
+    'Interview': '#6366f1',
     'Interviewed': '#a855f7',
     'Rejected': '#ef4444',
-    'Accepted': '#10b981'
+    'Accepted': '#10b981',
+    'OfferSent': '#ec4899'
   }
-  return map[name] || 'var(--r-text-sub)'
+  return map[name] || '#94a3b8'
 }
 
 const calculateWidth = (count) => {
@@ -69,8 +103,8 @@ const calculateWidth = (count) => {
   background: var(--glass-bg);
   backdrop-filter: blur(25px) saturate(200%);
   border: 1px solid var(--glass-border-color);
-  border-radius: 32px;
-  padding: 32px;
+  border-radius: 16px;
+  padding: 16px;
   box-shadow: var(--premium-shadow);
 }
 
@@ -80,14 +114,16 @@ const calculateWidth = (count) => {
 .column-header p { font-size: 14px; color: var(--text-muted); margin: 0 0 30px 0; font-weight: 500; }
 
 .pipeline-visual-v2 { display: flex; flex-direction: column; gap: 20px; }
-.p-row { display: flex; flex-direction: column; gap: 10px; }
+.p-row { display: flex; flex-direction: column; gap: 6px; }
 .p-info { display: flex; justify-content: space-between; align-items: center; }
-.p-name { font-size: 13px; font-weight: 700; color: var(--text-muted); }
-.p-count { font-size: 15px; font-weight: 900; color: var(--text-main); }
+.p-name-with-icon { display: flex; align-items: center; gap: 8px; }
+.step-mini-icon { opacity: 0.8; }
+.p-name { font-size: 12px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.2px; }
+.p-count { font-size: 14px; font-weight: 900; color: var(--text-main); }
 
-.p-bar-track { height: 14px; background: var(--border-thin); border-radius: 7px; overflow: visible; position: relative; }
+.p-bar-track { height: 6px; background: var(--border-thin); border-radius: 3px; overflow: visible; position: relative; }
 .p-bar-fill {
-  height: 100%; border-radius: 7px; position: relative;
+  height: 100%; border-radius: 3px; position: relative;
   transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
   animation: grow 1s ease forwards;
   animation-delay: var(--delay);

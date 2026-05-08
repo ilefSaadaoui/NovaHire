@@ -77,8 +77,8 @@ defineEmits(['update:selectedOfferId', 'export'])
   background: var(--glass-bg);
   backdrop-filter: blur(25px) saturate(200%);
   border: 1px solid var(--glass-border-color);
-  border-radius: 32px;
-  padding: 32px 40px;
+  border-radius: 16px;
+  padding: 12px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -102,13 +102,13 @@ defineEmits(['update:selectedOfferId', 'export'])
 
 .glitch-title { margin: 0; line-height: 1.1; }
 .gradient-text {
-  font-size: 38px;
+  font-size: 22px;
   font-weight: 900;
   background: var(--accent-grad);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  letter-spacing: -1px;
+  letter-spacing: -0.5px;
 }
 
 .dark-mode .gradient-text {
@@ -117,18 +117,18 @@ defineEmits(['update:selectedOfferId', 'export'])
 }
 
 .subtitle-premium {
-  margin: 8px 0 0 0;
+  margin: 4px 0 0 0;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .controls-section { display: flex; align-items: center; gap: 60px; }
 .filter-group { display: flex; flex-direction: column; gap: 8px; }
 .filter-label { font-size: 10px; font-weight: 800; color: var(--text-muted); opacity: 0.6; letter-spacing: 1px; }
-.select-container-glass { width: 300px; }
+.select-container-glass { width: 220px; }
 
-.v-divider { width: 1px; height: 60px; background: var(--border-thin); }
+.v-divider { width: 1px; height: 40px; background: var(--border-thin); }
 
 .actions-group { display: flex; gap: 16px; }
 

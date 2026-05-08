@@ -67,8 +67,8 @@ const formatValue = (val, type) => {
 <style scoped>
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
   width: 100%;
 }
 
@@ -77,8 +77,8 @@ const formatValue = (val, type) => {
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border-color);
-  border-radius: 24px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 12px;
   overflow: hidden;
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   display: flex;
@@ -150,7 +150,7 @@ const formatValue = (val, type) => {
 .kpi-label { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
 .kpi-value-row { display: flex; align-items: baseline; gap: 12px; margin-top: 4px; }
-.kpi-value { font-size: 32px; font-weight: 900; color: var(--text-main); letter-spacing: -1px; }
+.kpi-value { font-size: 18px; font-weight: 900; color: var(--text-main); letter-spacing: -0.5px; }
 
 .kpi-trend {
   font-size: 11px;

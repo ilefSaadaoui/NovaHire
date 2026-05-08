@@ -69,7 +69,7 @@ namespace Infrastructure.Services
                             page.Size(PageSizes.A4);
                             page.Margin(0);
                             page.PageColor(Colors.White);
-                            page.DefaultTextStyle(x => x.FontSize(10).FontFamily(Fonts.Helvetica).FontColor(TextDark));
+                            page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial").FontColor(TextDark));
                             
                             // --- HEADER ---
                             page.Header().Background(PrimaryBlue).Padding(30).Row(row =>
@@ -78,7 +78,7 @@ namespace Infrastructure.Services
                                 {
                                     col.Item().Text("RAPPORT DE RECRUTEMENT").FontSize(10).SemiBold().FontColor(Colors.White).LetterSpacing(0.1f);
                                     col.Item().Text(offer.Title.ToUpper()).FontSize(24).ExtraBold().FontColor(Colors.White);
-                                    col.Item().PaddingTop(5).Text($"{offer.Department?.Name ?? "General"} | {DateTime.Now:MMMM yyyy}").FontSize(10).FontColor(BorderLight);
+                                    col.Item().PaddingTop(5).Text($"{offer.Department ?? "General"} | {DateTime.Now:MMMM yyyy}").FontSize(10).FontColor(BorderLight);
                                 });
                                 row.ConstantItem(60).AlignCenter().AlignMiddle().Height(60).Width(60).Background(Colors.White).Padding(10).Text("NH").FontSize(20).ExtraBold().FontColor(PrimaryBlue);
                             });
@@ -114,60 +114,83 @@ namespace Infrastructure.Services
 
                                     table.Header(h =>
                                     {
-                                        h.Cell().Element(CellStyle).Text("#");
-                                        h.Cell().Element(CellStyle).Text("Candidat");
-                                        h.Cell().Element(CellStyle).Text("Statut");
-                                        h.Cell().Element(CellStyle).Text("Exp.");
-                                        h.Cell().Element(CellStyle).Text("Score");
+                                        h.Cell().Element(HeaderStyle).Text("#");
+                                        h.Cell().Element(HeaderStyle).Text("Candidat");
+                                        h.Cell().Element(HeaderStyle).Text("Statut");
+                                        h.Cell().Element(HeaderStyle).Text("Exp.");
+                                        h.Cell().Element(HeaderStyle).Text("Score");
 
-                                        static IContainer CellStyle(IContainer container) => container.DefaultTextStyle(x => x.SemiBold()).PaddingVertical(8).BorderBottom(1).BorderColor(TextDark);
+                                        static IContainer HeaderStyle(IContainer container) => container.Background(PrimaryBlue).PaddingVertical(8).PaddingHorizontal(5).DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White));
                                     });
 
                                     int i = 1;
                                     foreach (var app in sorted.Take(10))
                                     {
                                         var scoreColor = (app.AiScore ?? 0) >= 85 ? SuccessGreen : (app.AiScore ?? 0) >= 70 ? WarningAmber : DangerRed;
+                                        var isEven = i % 2 == 0;
+                                        var currentIdx = i++;
                                         
-                                        table.Cell().Element(RowStyle).Text(i++.ToString());
-                                        table.Cell().Element(RowStyle).Text($"{app.Candidate?.FirstName} {app.Candidate?.LastName}").Bold();
-                                        table.Cell().Element(RowStyle).Text(app.Status.ToString());
-                                        table.Cell().Element(RowStyle).Text($"{app.AIAnalysis?.TotalYearsExperience ?? 0:0} ans");
-                                        table.Cell().Element(RowStyle).Text($"{app.AiScore ?? 0}%").FontColor(scoreColor).Bold();
+                                        table.Cell().Background(isEven ? SlateBg : Colors.White).Element(RowStyle).Text(currentIdx.ToString());
+                                        table.Cell().Background(isEven ? SlateBg : Colors.White).Element(RowStyle).Text($"{app.Candidate?.FirstName} {app.Candidate?.LastName}").Bold();
+                                        table.Cell().Background(isEven ? SlateBg : Colors.White).Element(RowStyle).Text(TranslateStatus(app.Status.ToString()));
+                                        table.Cell().Background(isEven ? SlateBg : Colors.White).Element(RowStyle).Text($"{app.AIAnalysis?.TotalYearsExperience ?? 0:0} ans");
+                                        table.Cell().Background(isEven ? SlateBg : Colors.White).Element(RowStyle).Text($"{app.AiScore ?? 0}%").FontColor(scoreColor).Bold();
 
-                                        static IContainer RowStyle(IContainer container) => container.PaddingVertical(8).BorderBottom(1).BorderColor(BorderLight);
+                                        static IContainer RowStyle(IContainer container) => container
+                                            .PaddingVertical(6)
+                                            .PaddingHorizontal(5)
+                                            .BorderBottom(1)
+                                            .BorderColor(BorderLight);
                                     }
                                 });
 
                                 // --- STATS ROW ---
-                                col.Item().PaddingTop(30).Row(row =>
+                                col.Item().PaddingTop(35).Row(row =>
                                 {
                                     row.RelativeItem().Column(inner =>
                                     {
-                                        inner.Item().Text("PIPELINE DE RECRUTEMENT").FontSize(12).Bold();
+                                        inner.Item().BorderBottom(1).BorderColor(PrimaryBlue).PaddingBottom(5).Text("PIPELINE DE RECRUTEMENT").FontSize(12).Bold().FontColor(PrimaryBlue);
                                         inner.Item().PaddingTop(10).Column(pCol =>
                                         {
-                                            foreach (var step in analytics.PipelineData.Where(x => x.Count > 0))
+                                            var validSteps = analytics.PipelineData.Where(x => x.Count > 0).ToList();
+                                            var maxCount = validSteps.Any() ? validSteps.Max(x => x.Count) : 1;
+
+                                            foreach (var step in validSteps)
                                             {
-                                                pCol.Item().PaddingVertical(2).Row(r =>
+                                                pCol.Item().PaddingVertical(4).Column(stepCol =>
                                                 {
-                                                    r.RelativeItem().Text(step.Name);
-                                                    r.AutoItem().Text(step.Count.ToString()).Bold();
+                                                    stepCol.Item().Row(r =>
+                                                    {
+                                                        r.RelativeItem().Text(TranslateStatus(step.Name)).FontSize(9).SemiBold();
+                                                        r.AutoItem().Text(step.Count.ToString()).FontSize(9).Bold();
+                                                    });
+                                                    stepCol.Item().PaddingTop(2).Height(4).Row(barRow =>
+                                                    {
+                                                        if (step.Count > 0)
+                                                            barRow.RelativeItem(step.Count).Background(AccentBlue);
+                                                        
+                                                        if (maxCount - step.Count > 0)
+                                                            barRow.RelativeItem(maxCount - step.Count).Background(BorderLight);
+                                                    });
                                                 });
                                             }
                                         });
                                     });
+                                    
                                     row.Spacing(40);
+                                    
                                     row.RelativeItem().Column(inner =>
                                     {
-                                        inner.Item().Text("TOP SKILLS DÉTECTÉS").FontSize(12).Bold();
+                                        inner.Item().BorderBottom(1).BorderColor(PrimaryBlue).PaddingBottom(5).Text("TOP SKILLS DÉTECTÉS").FontSize(12).Bold().FontColor(PrimaryBlue);
                                         inner.Item().PaddingTop(10).Column(sCol =>
                                         {
-                                            foreach (var skill in analytics.TopSkills.Take(5))
+                                            foreach (var skill in analytics.TopSkills.Take(7))
                                             {
-                                                sCol.Item().PaddingVertical(2).Row(r =>
+                                                sCol.Item().PaddingVertical(3).Row(r =>
                                                 {
-                                                    r.RelativeItem().Text(skill.Name);
-                                                    r.AutoItem().Text(skill.Count.ToString()).FontColor(AccentBlue);
+                                                    r.ConstantItem(10).Text("•").Bold().FontColor(AccentBlue);
+                                                    r.RelativeItem().Text(skill.Name).FontSize(9);
+                                                    r.AutoItem().Background(SlateBg).PaddingHorizontal(5).Text(skill.Count.ToString()).FontSize(8).FontColor(TextMuted);
                                                 });
                                             }
                                         });
@@ -248,7 +271,7 @@ namespace Infrastructure.Services
                         page.Margin(0);
                         page.PageColor(Colors.White);
                         page.DefaultTextStyle(x =>
-                            x.FontSize(10).FontFamily(Fonts.Helvetica).FontColor(TextDark));
+                            x.FontSize(10).FontFamily("Arial").FontColor(TextDark));
 
                         // ── HEADER ───────────────────────────────────────────────
                         page.Header()
@@ -555,6 +578,22 @@ namespace Infrastructure.Services
                 },
                 PipelineData = pipeline,
                 TopSkills    = topSkills,
+            };
+        }
+
+        private static string TranslateStatus(string status)
+        {
+            return status switch
+            {
+                "Submitted"    => "Nouv. Candidat",
+                "UnderReview"  => "En Analyse",
+                "Shortlisted"  => "Shortlisté",
+                "Interview"    => "Entretien",
+                "Interviewed"  => "Post-Entretien",
+                "Rejected"     => "Refusé",
+                "Accepted"     => "Recruté",
+                "OfferSent"    => "Offre Envoyée",
+                _              => status
             };
         }
     }

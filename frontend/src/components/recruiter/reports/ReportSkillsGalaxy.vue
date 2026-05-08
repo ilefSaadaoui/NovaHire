@@ -36,8 +36,8 @@ defineProps({
   background: var(--glass-bg);
   backdrop-filter: blur(25px) saturate(200%);
   border: 1px solid var(--glass-border-color);
-  border-radius: 32px;
-  padding: 32px;
+  border-radius: 16px;
+  padding: 16px;
   box-shadow: var(--premium-shadow);
 }
 
@@ -50,17 +50,16 @@ defineProps({
 
 .skills-galaxy { display: flex; flex-wrap: wrap; gap: 15px; }
 .g-skill-tag {
-  background: rgba(255,255,255,0.03);
-  backdrop-filter: blur(5px);
+  background: rgba(255,255,255,0.02);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--border-thin);
-  padding: 12px 20px;
-  border-radius: 18px;
+  padding: 4px 10px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  transition: all 0.3s ease;
-  transform: scale(calc(var(--size) * 0.3 + 0.8));
-  opacity: calc(var(--size) * 0.5 + 0.5);
+  gap: 8px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(calc(var(--size) * 0.2 + 0.9));
 }
 
 .g-skill-tag:hover {
@@ -71,9 +70,10 @@ defineProps({
   border-color: var(--color);
 }
 
-.g-name { font-weight: 800; font-size: 16px; color: var(--text-main); }
-.g-skill-tag:hover .g-name { color: white; }
-.g-cnt { font-size: 11px; font-weight: 900; background: var(--card-bg); color: var(--accent-color); padding: 2px 8px; border-radius: 6px; }
+.g-name { font-weight: 700; font-size: 11px; color: var(--text-muted); opacity: 0.9; }
+.g-skill-tag:hover .g-name { color: white; opacity: 1; }
+.g-cnt { font-size: 10px; font-weight: 900; background: rgba(255,255,255,0.05); color: var(--text-main); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border-thin); }
+.g-skill-tag:hover .g-cnt { background: rgba(255,255,255,0.2); color: white; border-color: rgba(255,255,255,0.3); }
 
 .empty-mini { color: var(--text-muted); opacity: 0.5; font-size: 14px; font-weight: 600; padding: 40px 0; width: 100%; text-align: center; }
 
