@@ -20,7 +20,6 @@ namespace Application.DTOs.CompanyAdmin
         public List<TeamMemberStatsDto> TeamStats { get; set; } = new();
         public List<DepartmentStatDto> DepartmentStats { get; set; } = new();
         public GlobalFunnelDto FunnelData { get; set; } = new();
-        public Dictionary<string, int> SourcingData { get; set; } = new();
         public double AverageTimeToHire { get; set; }
         public double AiEfficiencyRate { get; set; }
     }

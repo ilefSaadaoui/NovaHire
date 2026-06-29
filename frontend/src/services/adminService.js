@@ -1,8 +1,8 @@
-import axios from 'axios';
+import api from '@/api/axios';
 
-// Ensure the base URL matches your backend environment setting.
-// Backend runs on port 5000 (see launchSettings.json).
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// The centralized axios instance has baseURL: '/api' (see @/api/axios.js).
+// All paths here must be RELATIVE to that base (e.g., '/admin/summary')
+// and must NOT include '/api' again to avoid the double-prefix bug (/api/api/...).
 
 const getAuthHeaders = () => {
     // Token is stored as 'authToken', not 'token'.
@@ -19,7 +19,7 @@ const getAuthHeaders = () => {
 export const adminService = {
     // ---- Dashboard General Metrics ----
     getSummary() {
-        return axios.get(`${API_URL}/admin/summary`, getAuthHeaders());
+        return api.get('/admin/summary', getAuthHeaders());
     },
 
     // ---- Users Endpoints ----
@@ -29,85 +29,85 @@ export const adminService = {
         if (companyId) qs += `&companyId=${companyId}`;
         if (search) qs += `&search=${search}`;
 
-        return axios.get(`${API_URL}/admin/users${qs}`, getAuthHeaders());
+        return api.get(`/admin/users${qs}`, getAuthHeaders());
     },
     getUserById(id) {
-        return axios.get(`${API_URL}/admin/users/${id}`, getAuthHeaders());
+        return api.get(`/admin/users/${id}`, getAuthHeaders());
     },
     createUser(data) {
-        return axios.post(`${API_URL}/admin/users`, data, getAuthHeaders());
+        return api.post('/admin/users', data, getAuthHeaders());
     },
     updateUser(id, data) {
-        return axios.put(`${API_URL}/admin/users/${id}`, data, getAuthHeaders());
+        return api.put(`/admin/users/${id}`, data, getAuthHeaders());
     },
     deleteUser(id) {
-        return axios.delete(`${API_URL}/admin/users/${id}`, getAuthHeaders());
+        return api.delete(`/admin/users/${id}`, getAuthHeaders());
     },
 
     // ---- Companies Endpoints ----
     getCompanies(pageNumber = 1, pageSize = 50) {
-        return axios.get(`${API_URL}/admin/companies?pageNumber=${pageNumber}&pageSize=${pageSize}`, getAuthHeaders());
+        return api.get(`/admin/companies?pageNumber=${pageNumber}&pageSize=${pageSize}`, getAuthHeaders());
     },
     getCompanyById(id) {
-        return axios.get(`${API_URL}/admin/companies/${id}`, getAuthHeaders());
+        return api.get(`/admin/companies/${id}`, getAuthHeaders());
     },
     createCompany(data) {
-        return axios.post(`${API_URL}/admin/companies`, data, getAuthHeaders());
+        return api.post('/admin/companies', data, getAuthHeaders());
     },
     updateCompany(id, data) {
-        return axios.put(`${API_URL}/admin/companies/${id}`, data, getAuthHeaders());
+        return api.put(`/admin/companies/${id}`, data, getAuthHeaders());
     },
     deleteCompany(id) {
-        return axios.delete(`${API_URL}/admin/companies/${id}`, getAuthHeaders());
+        return api.delete(`/admin/companies/${id}`, getAuthHeaders());
     },
     getPendingCompanies() {
-        return axios.get(`${API_URL}/admin/companies/pending`, getAuthHeaders());
+        return api.get('/admin/companies/pending', getAuthHeaders());
     },
     approveCompany(id) {
-        return axios.post(`${API_URL}/admin/companies/${id}/approve`, {}, getAuthHeaders());
+        return api.post(`/admin/companies/${id}/approve`, {}, getAuthHeaders());
     },
     rejectCompany(id) {
-        return axios.post(`${API_URL}/admin/companies/${id}/reject`, {}, getAuthHeaders());
+        return api.post(`/admin/companies/${id}/reject`, {}, getAuthHeaders());
     },
 
     // ---- Job Applications Endpoints ----
     getJobApplications(pageNumber = 1, pageSize = 200) {
-        return axios.get(`${API_URL}/admin/jobapplications?pageNumber=${pageNumber}&pageSize=${pageSize}`, getAuthHeaders());
+        return api.get(`/admin/jobapplications?pageNumber=${pageNumber}&pageSize=${pageSize}`, getAuthHeaders());
     },
 
     // ---- Candidates Endpoints ----
     getCandidateById(id) {
-        return axios.get(`${API_URL}/admin/candidates/${id}`, getAuthHeaders());
+        return api.get(`/admin/candidates/${id}`, getAuthHeaders());
     },
     updateCandidate(id, data) {
-        return axios.put(`${API_URL}/admin/candidates/${id}`, data, getAuthHeaders());
+        return api.put(`/admin/candidates/${id}`, data, getAuthHeaders());
     },
     deleteCandidate(id) {
-        return axios.delete(`${API_URL}/admin/candidates/${id}`, getAuthHeaders());
+        return api.delete(`/admin/candidates/${id}`, getAuthHeaders());
     },
 
     // ---- Activity Logs Endpoints ----
     getLogs(limit = 100) {
-        return axios.get(`${API_URL}/admin/logs?limit=${limit}`, getAuthHeaders());
+        return api.get(`/admin/logs?limit=${limit}`, getAuthHeaders());
     },
 
     // ---- Contact Messages Endpoints ----
     getContactMessages() {
-        return axios.get(`${API_URL}/admin/contact-messages`, getAuthHeaders());
+        return api.get('/admin/contact-messages', getAuthHeaders());
     },
     updateContactMessageStatus(id, status) {
-        return axios.put(`${API_URL}/admin/contact-messages/${id}/status`, { status }, getAuthHeaders());
+        return api.put(`/admin/contact-messages/${id}/status`, { status }, getAuthHeaders());
     },
 
     // ---- Profile Endpoints ----
     getCurrentProfile() {
-        return axios.get(`${API_URL}/admin/profile`, getAuthHeaders());
+        return api.get('/admin/profile', getAuthHeaders());
     },
     updateProfile(data) {
-        return axios.put(`${API_URL}/admin/profile`, data, getAuthHeaders());
+        return api.put('/admin/profile', data, getAuthHeaders());
     },
     getHealth() {
-        return axios.get(`${API_URL}/admin/health`, getAuthHeaders());
+        return api.get('/admin/health', getAuthHeaders());
     }
 };
 

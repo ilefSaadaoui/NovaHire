@@ -1,0 +1,384 @@
+@startuml NovaHire-Global-ClassDiagram
+' =============================================================================
+' NovaHire — Diagramme de classes GLOBAL (vue metier)
+' Conformite : OMG UML 2.5.1 | Outil : PlantUML
+' Aligne sur Backend/src/Domain/Entities/ et les 4 sprints du rapport PFE
+' =============================================================================
+
+title NovaHire — Diagramme de classes global (vue metier)\n<<specification>> OMG UML 2.5.1
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam defaultFontName Segoe UI
+
+legend right
+  |= Symbole |= Signification |
+  | *-- | Composition |
+  | o-- | Agregation |
+  | ..> | Dependance |
+  | - | Attribut (prive, convention analyse) |
+  | + | Operation (publique) |
+endlegend
+
+' =============================================================================
+' ENUMERATIONS
+' =============================================================================
+package "Enumerations" as PkgEnums {
+
+  enum StatutSociete {
+    En_attente
+    Validee
+    Refusee
+    Suspendue
+  }
+
+  enum RoleCollaborateur {
+    Admin_plateforme
+    Admin_entreprise
+    Recruteur
+  }
+
+  enum StatutOffre {
+    Brouillon
+    Publiee
+    Fermee
+    Archivee
+  }
+
+  enum StatutCandidature {
+    Recue
+    En_analyse
+    Preselection
+    Entretien
+    Entretien_realise
+    Offre_envoyee
+    Acceptee
+    Refusee
+  }
+
+  enum StatutEntretien {
+    Planifie
+    Realise
+    Annule
+    Reporte
+    Absent
+  }
+
+  enum StatutMessageSupport {
+    Nouveau
+    En_cours
+    Traite
+    Archive
+  }
+}
+
+' =============================================================================
+' ORGANISATION & TENANT
+' =============================================================================
+package "Organisation" as PkgOrg {
+
+  class Societe {
+    -nom : String
+    -secteur : String
+    -emailContact : String
+    -couleurPrimaire : String
+    -couleurSecondaire : String
+    -statut : StatutSociete
+    -active : Boolean
+    -dateCreation : Date
+    __
+    +inscrire() : void
+    +approuver() : void
+    +rejeter() : void
+    +suspendre() : void
+  }
+
+  class Departement {
+    -nom : String
+    -description : String
+    __
+    +creer() : void
+    +affecterCollaborateur() : void
+  }
+
+  class Collaborateur {
+    -nom : String
+    -prenom : String
+    -email : String
+    -motDePasseHash : String
+    -role : RoleCollaborateur
+    -actif : Boolean
+    __
+    +seConnecter() : Boolean
+    +mettreAJourProfil() : void
+    +changerMotDePasse() : void
+  }
+
+  class AdminPlateforme {
+    +validerEntreprise() : void
+    +gererUtilisateurs() : void
+    +consulterTableauBord() : void
+  }
+
+  class AdminEntreprise {
+    +inviterRecruteur() : void
+    +gererEquipe() : void
+    +configurerBranding() : void
+  }
+}
+
+' =============================================================================
+' RECRUTEMENT
+' =============================================================================
+package "Recrutement" as PkgRec {
+
+  class OffreEmploi {
+    -titre : String
+    -description : String
+    -lieu : String
+    -typeContrat : String
+    -dateLimite : Date
+    -statut : StatutOffre
+    -jetonPartage : String
+    -seuilRejetAuto : Integer
+    __
+    +publier() : void
+    +fermer() : void
+    +estActive() : Boolean
+    +genererDescriptionIA() : void
+  }
+
+  class Candidat {
+    -nom : String
+    -prenom : String
+    -email : String
+    -telephone : String
+    -urlCVPrincipal : String
+    __
+    +postuler(offre) : Candidature
+  }
+
+  class Candidature {
+    -dateDepot : Date
+    -statut : StatutCandidature
+    -urlCV : String
+    -scoreIA : Integer
+    -scoreQuiz : Integer
+    -contenuOffreEmbauche : String
+    -notesRecruteur : String
+    __
+    +changerStatut(nouveauStatut) : void
+    +lancerAnalyseIA() : void
+    +comparerAvec(autre) : void
+    +genererOffreEmbauche() : void
+  }
+}
+
+' =============================================================================
+' SELECTION & PIPELINE
+' =============================================================================
+package "Selection" as PkgSel {
+
+  class Entretien {
+    -dateHeure : DateTime
+    -type : String
+    -lienOuLieu : String
+    -statut : StatutEntretien
+    __
+    +planifier() : void
+    +envoyerInvitation() : void
+  }
+
+  class CommentaireCandidature {
+    -contenu : String
+    -date : Date
+    -idCommentaireParent : Guid
+    __
+    +ajouter() : void
+  }
+
+  class EvaluationRecruteur {
+    -note : Integer
+    -commentaire : String
+    __
+    +noter() : void
+  }
+
+  class Notification {
+    -titre : String
+    -message : String
+    -lue : Boolean
+    __
+    +envoyer() : void
+    +marquerCommeLue() : void
+  }
+}
+
+' =============================================================================
+' EVALUATION (QUIZ & IA)
+' =============================================================================
+package "Evaluation" as PkgEval {
+
+  class QuizPreselection {
+    -titre : String
+    -dureeMinutes : Integer
+    -actif : Boolean
+    __
+    +genererParIA() : void
+    +envoyerAuCandidat() : void
+    +regenerer() : void
+  }
+
+  class QuestionQuiz {
+    -enonce : String
+    -options : String[]
+    -bonneReponse : Integer
+  }
+
+  class ResultatQuiz {
+    -score : Real
+    -reponses : Integer[]
+    -datePassage : Date
+    __
+    +calculerScore() : Real
+    +soumettre() : void
+  }
+
+  class AnalyseIAProfil <<datatype>> {
+    -scoreGlobal : Integer
+    -scoreExperience : Integer
+    -scoreFormation : Integer
+    -scoreCompetences : Integer
+    -resume : String
+    -recommandation : String
+    -pointsForts : String[]
+    -pointsVigilance : String[]
+    -questionsEntretien : String[]
+    __
+    +extraireDonneesCV() : void
+    +calculerScores() : void
+  }
+}
+
+' =============================================================================
+' PLATEFORME
+' =============================================================================
+package "Plateforme" as PkgPlat {
+
+  class TraceActivite {
+    -action : String
+    -typeEntite : String
+    -details : String
+    -date : Date
+    -auteurEmail : String
+    __
+    +enregistrer() : void
+    +filtrer(criteres) : TraceActivite[]
+  }
+
+  class MessageContact {
+    -nom : String
+    -email : String
+    -entreprise : String
+    -telephone : String
+    -message : String
+    -statut : StatutMessageSupport
+    -dateEnvoi : Date
+    __
+    +envoyer() : void
+    +changerStatut() : void
+  }
+}
+
+' =============================================================================
+' GENERALISATION
+' =============================================================================
+AdminPlateforme --|> Collaborateur
+AdminEntreprise --|> Collaborateur
+
+' =============================================================================
+' ASSOCIATIONS — ORGANISATION
+' =============================================================================
+Societe "1" *-- "0..*" Departement : contient
+Societe "1" o-- "0..*" Collaborateur : emploie
+Societe "1" *-- "0..*" OffreEmploi : publie
+Societe "1" o-- "0..*" Candidat : enregistre
+Departement "1" o-- "0..*" Collaborateur : regroupe
+
+' =============================================================================
+' ASSOCIATIONS — RECRUTEMENT
+' =============================================================================
+Collaborateur "1" o-- "0..*" OffreEmploi : cree
+OffreEmploi "1" o-- "0..*" Candidature : recoit
+Candidat "1" o-- "0..*" Candidature : depose
+Collaborateur "0..1" o-- "0..*" Candidature : instruit
+
+Candidature "1" *-- "0..1" AnalyseIAProfil : diagnostic
+
+' =============================================================================
+' ASSOCIATIONS — SELECTION
+' =============================================================================
+Candidature "1" o-- "0..*" Entretien : planifie
+Candidature "1" o-- "0..*" CommentaireCandidature : commentaires
+Candidature "1" o-- "0..*" EvaluationRecruteur : evalue
+Candidature "1" o-- "0..*" Notification : alertes
+
+Collaborateur "1" o-- "0..*" Entretien : anime
+Collaborateur "1" o-- "0..*" CommentaireCandidature : redige
+Collaborateur "1" o-- "0..*" EvaluationRecruteur : attribue
+
+CommentaireCandidature "0..1" o-- "0..*" CommentaireCandidature : fil
+
+' =============================================================================
+' ASSOCIATIONS — EVALUATION
+' =============================================================================
+OffreEmploi "1" o-- "0..*" QuizPreselection : quiz
+QuizPreselection "1" *-- "1..*" QuestionQuiz : contient
+Candidature "1" o-- "0..*" ResultatQuiz : resultats
+QuizPreselection "1" o-- "0..*" ResultatQuiz : evalue
+
+' =============================================================================
+' ASSOCIATIONS — PLATEFORME
+' =============================================================================
+TraceActivite ..> Societe : audite
+TraceActivite ..> Collaborateur : auteur
+TraceActivite ..> OffreEmploi : audite
+TraceActivite ..> Candidature : audite
+MessageContact ..> AdminPlateforme : traite par
+
+' =============================================================================
+' TYPAGE
+' =============================================================================
+Societe ..> StatutSociete
+Collaborateur ..> RoleCollaborateur
+OffreEmploi ..> StatutOffre
+Candidature ..> StatutCandidature
+Entretien ..> StatutEntretien
+MessageContact ..> StatutMessageSupport
+
+note top of Candidature
+  **Agregat central du systeme**
+  Lie 1 Candidat + 1 OffreEmploi
+  Entretiens, quiz, IA, offre embauche
+end note
+
+note bottom of Societe
+  Multi-tenant : chaque societe isole
+  ses offres, collaborateurs et candidats.
+  Validation SuperAdmin au Sprint 4.
+end note
+
+note bottom of StatutMessageSupport
+  Code C# : New, InProgress,
+  Resolved, Archived
+end note
+
+note bottom of StatutCandidature
+  Preselection = Shortlisted
+  Entretien_realise = Interviewed
+  Offre_envoyee = OfferSent
+end note
+
+@enduml

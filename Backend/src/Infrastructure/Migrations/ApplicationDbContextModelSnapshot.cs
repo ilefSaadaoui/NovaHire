@@ -357,14 +357,14 @@ namespace Infrastructure.Migrations
                         {
                             Id = new Guid("d001d001-d001-d001-d001-d001d001d001"),
                             CompanyId = new Guid("11111111-1111-1111-1111-111111111111"),
-                            CreatedAt = new DateTime(2026, 5, 6, 0, 20, 7, 637, DateTimeKind.Utc).AddTicks(788),
+                            CreatedAt = new DateTime(2026, 6, 14, 22, 44, 10, 183, DateTimeKind.Utc).AddTicks(1445),
                             Name = "Tech & Innovation"
                         },
                         new
                         {
                             Id = new Guid("d002d002-d002-d002-d002-d002d002d002"),
                             CompanyId = new Guid("11111111-1111-1111-1111-111111111111"),
-                            CreatedAt = new DateTime(2026, 5, 6, 0, 20, 7, 637, DateTimeKind.Utc).AddTicks(2477),
+                            CreatedAt = new DateTime(2026, 6, 14, 22, 44, 10, 183, DateTimeKind.Utc).AddTicks(2599),
                             Name = "Human Resources"
                         });
                 });

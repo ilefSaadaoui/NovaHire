@@ -40,17 +40,18 @@
             <Sword :size="18" />
             <span>Battle Mode</span>
             <div v-if="selectedForComparison.length > 0" class="selection-counter">
-              {{ selectedForComparison.length }}
+              {{ selectedForComparison.length }}/2
             </div>
           </button>
 
           <button 
             v-if="compareMode" 
             class="btn-luxury primary launch-battle-btn" 
-            :disabled="selectedForComparison.length < 2"
-            @click="showComparisonModal = true"
+            :disabled="!canLaunchBattleComparison"
+            :title="battleCompareButtonTitle"
+            @click="launchBattleComparison"
           >
-            Comparer ({{ selectedForComparison.length }})
+            Comparer 2 ({{ selectedForComparison.length }}/2)
           </button>
 
           <div class="view-switch">
@@ -119,8 +120,13 @@
                 @dragend="handleDragEnd"
               >
                 <div class="card-top" style="display: flex; gap: 12px; margin-bottom: 12px;">
-                  <div v-if="compareMode" class="card-selection-check" @click.stop="toggleCandidateSelection(c)">
-                    <div class="check-box" :class="{ checked: isSelected(c.id) }">
+                  <div
+                    v-if="compareMode"
+                    class="card-selection-check"
+                    :class="{ 'selection-disabled': isCompareSelectionDisabled(c.id) }"
+                    @click.stop="toggleCandidateSelection(c)"
+                  >
+                    <div class="check-box" :class="{ checked: isSelected(c.id), disabled: isCompareSelectionDisabled(c.id) }">
                       <Check v-if="isSelected(c.id)" :size="14" />
                     </div>
                   </div>
@@ -301,6 +307,8 @@ import { useAuthStore } from '@/stores/authStore'
 import { useThemeStore } from '@/stores/themeStore'
 import { useRecruitmentStore } from '@/stores/recruitmentStore'
 import api from '@/api/axios'
+import { useToastStore } from '@/stores/toastStore'
+import { useModalStore } from '@/stores/modalStore'
 
 export default {
   name: 'Candidatures',
@@ -345,7 +353,13 @@ export default {
   async mounted() {
     await this.fetchOffers()
     if (this.offers.length > 0) {
-       this.selectedOfferId = this.offers[0].id
+       const queryOfferId = this.$route.query.jobOfferId
+       const exists = this.offers.some(o => o.id === queryOfferId)
+       if (queryOfferId && exists) {
+         this.selectedOfferId = queryOfferId
+       } else {
+         this.selectedOfferId = this.offers[0].id
+       }
        await this.fetchApplications()
     } else {
        this.isLoading = false
@@ -372,6 +386,24 @@ export default {
     },
     allCandidates() {
       return this.columns.flatMap(col => col.candidates)
+    },
+    canLaunchBattleComparison() {
+      if (this.selectedForComparison.length !== 2) return false
+      return this.selectedForComparison.every(id => {
+        const c = this.allCandidates.find(x => x.id === id)
+        return c && this.hasAiAnalysis(c)
+      })
+    },
+    battleCompareButtonTitle() {
+      if (this.selectedForComparison.length !== 2) {
+        return 'Sélectionnez exactement 2 candidats'
+      }
+      const missing = this.selectedForComparison
+        .map(id => this.allCandidates.find(x => x.id === id))
+        .filter(c => c && !this.hasAiAnalysis(c))
+      if (missing.length === 0) return 'Comparer les scores IA des 2 candidats'
+      const names = missing.map(c => c.name).join(', ')
+      return `Analyse IA requise pour : ${names}`
     },
     rankedCandidates() {
       // Sort by score descending — unscored candidates go to the end
@@ -443,7 +475,7 @@ export default {
             initials: (app.firstName[0] + (app.lastName[0] || '')).toUpperCase(),
             role: app.role || 'Candidat',
             skills: app.skills || [],
-            score: app.score || app.aiScore,
+            score: app.score ?? app.aiScore ?? null,
             date: app.date || '...',
             stage: colId,
             aiSummary: app.aiSummary,
@@ -547,22 +579,38 @@ export default {
     async analyzeCandidate(candidate) {
       if (candidate.isAnalyzing) return
       if (!candidate?.resumeUrl) {
+        useToastStore().show("Impossible d'analyser : aucun CV disponible pour ce candidat.", 'error')
         return
       }
       candidate.isAnalyzing = true
       try {
         const res = await api.post(`/recruiter/applications/${candidate.id}/analyze`)
         candidate.score = res.data.score
-        
-        // Handle automated Fast-Track from backend
-        const newStatus = res.data.status.toLowerCase()
+
+        // Determine target column from backend-returned status (integer enum)
+        const backendStatus = res.data.status
+        const targetStage = this.mapStatusToId(backendStatus)
         const currentStage = candidate.stage
-        
-        if (currentStage !== newStatus) {
-          this.moveCard(candidate, currentStage, newStatus)
+
+        if (targetStage && targetStage !== currentStage) {
+          this.moveCard(candidate, currentStage, targetStage)
+          if (targetStage === 'rejected') {
+            useToastStore().show(
+              `Candidat automatiquement rejeté — score IA ${candidate.score}% inférieur au seuil configuré.`,
+              'error'
+            )
+          } else {
+            useToastStore().show(
+              `Analyse terminée — score : ${candidate.score}%. Candidat déplacé en « ${this.getStageName(targetStage)} ».`,
+              'success'
+            )
+          }
+        } else {
+          useToastStore().show(`Analyse terminée — score : ${candidate.score}%.`, 'success')
         }
       } catch (err) {
         console.error('Erreur analyse:', err)
+        useToastStore().show(`Erreur lors de l'analyse : ${err.response?.data?.message || err.message}`, 'error')
       } finally {
         candidate.isAnalyzing = false
       }
@@ -606,9 +654,10 @@ export default {
       }
     },
     toggleCandidateSelection(candidate) {
+      const maxCompareCandidates = 2
       const idx = this.selectedForComparison.indexOf(candidate.id)
       if (idx === -1) {
-        if (this.selectedForComparison.length >= 3) {
+        if (this.selectedForComparison.length >= maxCompareCandidates) {
           return
         }
         this.selectedForComparison.push(candidate.id)
@@ -619,27 +668,57 @@ export default {
     isSelected(id) {
       return this.selectedForComparison.includes(id)
     },
+    isCompareSelectionDisabled(id) {
+      return (
+        this.compareMode &&
+        this.selectedForComparison.length >= 2 &&
+        !this.isSelected(id)
+      )
+    },
+    hasAiAnalysis(candidate) {
+      return candidate.score !== null && candidate.score !== undefined
+    },
+    launchBattleComparison() {
+      if (this.selectedForComparison.length !== 2) {
+        useToastStore().show('Sélectionnez exactement 2 candidats à comparer.', 'warning')
+        return
+      }
+      const missing = this.selectedForComparison
+        .map(id => this.allCandidates.find(x => x.id === id))
+        .filter(c => c && !this.hasAiAnalysis(c))
+      if (missing.length > 0) {
+        const names = missing.map(c => c.name).join(' et ')
+        useToastStore().show(
+          `Analyse IA requise avant la comparaison. Lancez l'analyse CV pour : ${names}.`,
+          'warning'
+        )
+        return
+      }
+      this.showComparisonModal = true
+    },
     async sendQuizToAllStage(stageId) {
       const col = this.columns.find(c => c.id === stageId);
       if (!col || col.candidates.length === 0) return;
 
-      if (!confirm(`Envoyer le quiz IA aux ${col.candidates.length} candidats de cette étape ?`)) return;
+      const modalStore = useModalStore();
+      const confirmed = await modalStore.confirm({
+        title: 'Envoyer le Quiz IA ?',
+        message: `Envoyer le quiz IA aux ${col.candidates.length} candidat(s) de l’étape « ${col.title} » ?`,
+        confirmText: 'Envoyer',
+        cancelText: 'Annuler',
+        type: 'warning'
+      });
+      if (!confirmed) return;
 
       this.sendingBulk = true;
       try {
         const ids = col.candidates.map(c => c.id);
         const res = await api.post('/recruiter/applications/bulk-send-quiz', ids);
-        
-        if (window.showToast) {
-          window.showToast(res.data.message, 'success');
-        } else {
-          alert(res.data.message);
-        }
+        useToastStore().show(res.data.message || 'Quiz envoyé avec succès !', 'success');
       } catch (err) {
         console.error('Erreur envoi groupé:', err);
         const msg = err.response?.data?.message || "Erreur lors de l'envoi groupé.";
-        if (window.showToast) window.showToast(msg, 'error');
-        else alert(msg);
+        useToastStore().show(msg, 'error');
       } finally {
         this.sendingBulk = false;
       }

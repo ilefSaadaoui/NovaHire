@@ -12,9 +12,12 @@ using QuestPDF.Infrastructure;
 
 namespace Infrastructure.Services
 {
+    /// <summary>
+    /// Service d'exportation de données et rapports au format PDF (via QuestPDF) et Excel (via ClosedXML).
+    /// </summary>
     public class ExportService : IExportService
     {
-        // ─── Palette ────────────────────────────────────────────────────────────
+        // ─── Palette de Couleurs Graphiques ──────────────────────────────────────
         private const string PrimaryBlue   = "#1D4ED8";
         private const string AccentBlue    = "#3B82F6";
         private const string SuccessGreen  = "#10B981";
@@ -25,7 +28,9 @@ namespace Infrastructure.Services
         private const string SlateBg       = "#F8FAFC";
         private const string BorderLight   = "#E2E8F0";
 
-        // ─── Analytics Snapshot ─────────────────────────────────────────────────
+        /// <summary>
+        /// Classe scellée interne représentant un instantané d'analyse pour la génération de rapports.
+        /// </summary>
         private sealed class ReportAnalyticsSnapshot
         {
             public int    TotalCandidates    { get; init; }
@@ -42,14 +47,25 @@ namespace Infrastructure.Services
             public List<(string Name,  int Count)>                   TopSkills     { get; init; } = new();
         }
 
+        /// <summary>
+        /// Initialise une nouvelle instance de la classe <see cref="ExportService"/>.
+        /// Configure le type de licence communautaire pour QuestPDF.
+        /// </summary>
         public ExportService()
         {
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
         // ════════════════════════════════════════════════════════════════════════
-        //  PDF — JOB OFFER REPORT
+        //  PDF — RAPPORT D'OFFRE D'EMPLOI
         // ════════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Génère un rapport PDF complet de recrutement pour une offre d'emploi spécifique et ses candidatures associées.
+        /// </summary>
+        /// <param name="offer">L'entité représentant l'offre d'emploi.</param>
+        /// <param name="applications">La liste des candidatures liées à cette offre.</param>
+        /// <returns>Un tableau d'octets représentant le fichier PDF généré.</returns>
         public async Task<byte[]> GenerateJobOfferReportPdfAsync(JobOffer offer, IEnumerable<JobApplication> applications)
         {
             return await Task.Run(() =>
@@ -71,7 +87,7 @@ namespace Infrastructure.Services
                             page.PageColor(Colors.White);
                             page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial").FontColor(TextDark));
                             
-                            // --- HEADER ---
+                            // --- EN-TÊTE DU DOCUMENT ---
                             page.Header().Background(PrimaryBlue).Padding(30).Row(row =>
                             {
                                 row.RelativeItem().Column(col =>
@@ -85,7 +101,7 @@ namespace Infrastructure.Services
 
                             page.Content().Padding(30).Column(col =>
                             {
-                                // --- KPI GRID ---
+                                // --- GRILLE DE KPI ---
                                 col.Item().Row(row =>
                                 {
                                     row.Spacing(15);
@@ -99,7 +115,7 @@ namespace Infrastructure.Services
                                     }
                                 });
 
-                                // --- TOP CANDIDATES SECTION ---
+                                // --- SECTION DES MEILLEURS CANDIDATS ---
                                 col.Item().PaddingTop(30).Text("TOP 10 CANDIDATS (MATCHING IA)").FontSize(14).Bold().FontColor(PrimaryBlue);
                                 col.Item().PaddingTop(10).Table(table =>
                                 {
@@ -144,7 +160,7 @@ namespace Infrastructure.Services
                                     }
                                 });
 
-                                // --- STATS ROW ---
+                                // --- SECONDE LIGNE : PIPELINE ET COMPÉTENCES CLÉS ---
                                 col.Item().PaddingTop(35).Row(row =>
                                 {
                                     row.RelativeItem().Column(inner =>
@@ -196,8 +212,9 @@ namespace Infrastructure.Services
                                         });
                                     });
                                 });
-                            });
+                             });
 
+                            // --- PIED DE PAGE ---
                             page.Footer().Padding(30).AlignCenter().Text(x =>
                             {
                                 x.Span("Page ");
@@ -219,8 +236,15 @@ namespace Infrastructure.Services
         }
 
         // ════════════════════════════════════════════════════════════════════════
-        //  EXCEL — JOB OFFER REPORT
+        //  EXCEL — RAPPORT D'OFFRE D'EMPLOI
         // ════════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Génère un fichier Excel contenant plusieurs onglets de statistiques (Tableau de Bord, Candidatures, Pipeline, Compétences).
+        /// </summary>
+        /// <param name="offer">L'offre d'emploi analysée.</param>
+        /// <param name="applications">Les candidatures soumises à l'offre.</param>
+        /// <returns>Le classeur Excel converti en tableau d'octets.</returns>
         public async Task<byte[]> GenerateJobOfferReportExcelAsync(
             JobOffer offer, IEnumerable<JobApplication> applications)
         {
@@ -231,19 +255,19 @@ namespace Infrastructure.Services
 
                 using var workbook = new XLWorkbook();
 
-                // ── Sheet 1: Tableau de Bord ──────────────────────────────────
+                // ── Onglet 1: Tableau de Bord ──────────────────────────────────
                 var dashboard = workbook.Worksheets.Add("Tableau de Bord");
                 StyleDashboardSheet(dashboard, offer, analytics);
 
-                // ── Sheet 2: Candidatures ─────────────────────────────────────
+                // ── Onglet 2: Candidatures ─────────────────────────────────────
                 var candidatesSheet = workbook.Worksheets.Add("Candidatures");
                 StyleCandidatesSheet(candidatesSheet, apps);
 
-                // ── Sheet 3: Pipeline ─────────────────────────────────────────
+                // ── Onglet 3: Pipeline ─────────────────────────────────────────
                 var pipelineSheet = workbook.Worksheets.Add("Pipeline");
                 StylePipelineSheet(pipelineSheet, analytics);
 
-                // ── Sheet 4: Top Compétences ──────────────────────────────────
+                // ── Onglet 4: Top Compétences ──────────────────────────────────
                 var skillsSheet = workbook.Worksheets.Add("Top Compétences");
                 StyleSkillsSheet(skillsSheet, analytics);
 
@@ -254,8 +278,14 @@ namespace Infrastructure.Services
         }
 
         // ════════════════════════════════════════════════════════════════════════
-        //  PDF — CANDIDATE PROFILE
+        //  PDF — PROFIL DÉTAILLÉ DU CANDIDAT
         // ════════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Génère un dossier d'évaluation PDF pour un candidat donné avec ses analyses IA.
+        /// </summary>
+        /// <param name="application">La candidature contenant les détails du candidat et son analyse IA.</param>
+        /// <returns>Le dossier d'évaluation sous forme de tableau d'octets.</returns>
         public async Task<byte[]> GenerateCandidateProfilePdfAsync(JobApplication application)
         {
             return await Task.Run(() =>
@@ -273,7 +303,7 @@ namespace Infrastructure.Services
                         page.DefaultTextStyle(x =>
                             x.FontSize(10).FontFamily("Arial").FontColor(TextDark));
 
-                        // ── HEADER ───────────────────────────────────────────────
+                        // ── EN-TÊTE DU RAPPORT INDIVIDUEL ────────────────────────
                         page.Header()
                             .Background(PrimaryBlue)
                             .PaddingHorizontal(40).PaddingVertical(30)
@@ -319,14 +349,14 @@ namespace Infrastructure.Services
                             .PaddingHorizontal(40).PaddingVertical(35)
                             .Column(col =>
                             {
-                                // --- EXECUTIVE SUMMARY ---
+                                // --- RÉSUMÉ EXÉCUTIF ---
                                 if (!string.IsNullOrEmpty(analysis?.AutoGeneratedSummary))
                                 {
                                     col.Item().Text("RÉSUMÉ EXÉCUTIF").FontSize(12).Bold().FontColor(PrimaryBlue);
                                     col.Item().PaddingTop(8).Background(SlateBg).Padding(15).Text(analysis.AutoGeneratedSummary).LineHeight(1.4f).Italic();
                                 }
 
-                                // --- STATS ROW ---
+                                // --- STATISTIQUES ET RECOMMANDATION IA ---
                                 col.Item().PaddingTop(25).Row(row =>
                                 {
                                     row.Spacing(20);
@@ -344,7 +374,7 @@ namespace Infrastructure.Services
                                     });
                                 });
 
-                                // --- SKILLS CLOUD ---
+                                // --- COMPÉTENCES IDENTIFIÉES ---
                                 if (analysis?.IdentifiedSkills?.Any() == true)
                                 {
                                     col.Item().PaddingTop(30).Text("COMPÉTENCES CLÉS").FontSize(12).Bold().FontColor(PrimaryBlue);
@@ -358,7 +388,7 @@ namespace Infrastructure.Services
                                     });
                                 }
 
-                                // --- STRENGTHS & WEAKNESSES ---
+                                // --- POINTS FORTS ET POINTS DE VIGILANCE ---
                                 col.Item().PaddingTop(35).Row(row =>
                                 {
                                     row.Spacing(30);
@@ -386,7 +416,7 @@ namespace Infrastructure.Services
                                     });
                                 });
 
-                                // --- INTERVIEW QUESTIONS ---
+                                // --- QUESTIONS D'ENTRETIEN RECOMMANDÉES PAR L'IA ---
                                 if (analysis?.InterviewQuestions?.Any() == true)
                                 {
                                     col.Item().PaddingTop(35).Text("QUESTIONS D'ENTRETIEN SUGGÉRÉES").FontSize(12).Bold().FontColor(PrimaryBlue);
@@ -407,6 +437,7 @@ namespace Infrastructure.Services
                                 }
                             });
 
+                        // --- PIED DE PAGE ---
                         page.Footer().Padding(30).AlignCenter().Column(fCol => {
                             fCol.Item().Text("Ce rapport a été généré par l'Intelligence Artificielle NovaHire. Il doit être utilisé comme outil d'aide à la décision.").FontSize(7).FontColor(TextMuted).AlignCenter();
                             fCol.Item().PaddingTop(5).Text(x =>
@@ -425,8 +456,12 @@ namespace Infrastructure.Services
         }
 
         // ════════════════════════════════════════════════════════════════════════
-        //  EXCEL STYLE HELPERS
+        //  MÉTHODES D'AIDE ET DE MISE EN FORME EXCEL
         // ════════════════════════════════════════════════════════════════════════
+        
+        /// <summary>
+        /// Applique la mise en forme et insère les statistiques générales sur l'onglet Tableau de Bord d'un fichier Excel.
+        /// </summary>
         private static void StyleDashboardSheet(IXLWorksheet ws, JobOffer offer, ReportAnalyticsSnapshot analytics)
         {
             ws.Cell(1, 1).Value = "RAPPORT DE RECRUTEMENT - " + offer.Title.ToUpper();
@@ -443,6 +478,9 @@ namespace Infrastructure.Services
             ws.Columns().AdjustToContents();
         }
 
+        /// <summary>
+        /// Liste tous les candidats et leurs scores associés sous forme de tableau Excel formaté.
+        /// </summary>
         private static void StyleCandidatesSheet(IXLWorksheet ws, List<JobApplication> apps)
         {
             ws.Cell(1, 1).Value = "LISTE DES CANDIDATS";
@@ -468,6 +506,9 @@ namespace Infrastructure.Services
             ws.Columns().AdjustToContents();
         }
 
+        /// <summary>
+        /// Présente le nombre de candidats par étape de recrutement sous forme tabulaire dans Excel.
+        /// </summary>
         private static void StylePipelineSheet(IXLWorksheet ws, ReportAnalyticsSnapshot analytics)
         {
             ws.Cell(1, 1).Value = "PIPELINE DE RECRUTEMENT";
@@ -487,6 +528,9 @@ namespace Infrastructure.Services
             ws.Columns().AdjustToContents();
         }
 
+        /// <summary>
+        /// Écrit la liste des compétences les plus fréquentes et leurs occurrences dans Excel.
+        /// </summary>
         private static void StyleSkillsSheet(IXLWorksheet ws, ReportAnalyticsSnapshot analytics)
         {
             ws.Cell(1, 1).Value = "TOP COMPÉTENCES DÉTECTÉES";
@@ -506,6 +550,9 @@ namespace Infrastructure.Services
             ws.Columns().AdjustToContents();
         }
 
+        /// <summary>
+        /// Méthode d'aide pour fusionner des cellules Excel et leur appliquer des couleurs d'en-tête uniformes.
+        /// </summary>
         private static void ApplyHeaderStyle(IXLRange range, string bgHex, int fontSize, string? fontColorHex = null)
         {
             range.Merge();
@@ -516,6 +563,11 @@ namespace Infrastructure.Services
             range.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         }
 
+        /// <summary>
+        /// Calcule les statistiques consolidées de recrutement et extrait les compétences clés à partir d'une liste de candidatures.
+        /// </summary>
+        /// <param name="applications">La collection de candidatures à analyser.</param>
+        /// <returns>Une instance remplie de <see cref="ReportAnalyticsSnapshot"/>.</returns>
         private static ReportAnalyticsSnapshot BuildAnalytics(List<JobApplication> applications)
         {
             if (applications == null) return new ReportAnalyticsSnapshot();
@@ -581,6 +633,11 @@ namespace Infrastructure.Services
             };
         }
 
+        /// <summary>
+        /// Traduit en français le libellé brut d'un statut de candidature.
+        /// </summary>
+        /// <param name="status">La chaîne représentant le statut en anglais.</param>
+        /// <returns>La chaîne traduite en français.</returns>
         private static string TranslateStatus(string status)
         {
             return status switch

@@ -33,8 +33,10 @@ export const useRecruitmentStore = defineStore('recruitment', {
       
       this.loading = true
       try {
-        const res = await api.get('/JobOffer')
-        this.offers = res.data.data || []
+        const res = await api.get('/JobOffer', { params: { page: 1, limit: 200 } })
+        const raw = res.data.data || []
+        const seenIds = new Set()
+        this.offers = raw.filter(o => o?.id && !seenIds.has(o.id) && seenIds.add(o.id))
       } catch (err) {
         console.error('Error fetching offers:', err)
       } finally {

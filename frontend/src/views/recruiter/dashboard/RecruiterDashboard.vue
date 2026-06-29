@@ -26,9 +26,7 @@
               {{ p.label }}
             </button>
           </div>
-          <div class="header-action-group" style="display: flex; gap: 12px; margin-left: 24px;">
-            <NotificationBell />
-          </div>
+
         </div>
       </header>
 
@@ -368,7 +366,7 @@
 import { useAuthStore } from '@/stores/authStore'
 import { useThemeStore } from '@/stores/themeStore'
 import Sidebar from '@/components/layout/Sidebar.vue'
-import NotificationBell from '@/components/common/NotificationBell.vue'
+
 import {
   Users,
   Briefcase,
@@ -392,8 +390,7 @@ import api from '@/api/axios'
 export default {
   name: 'RecruiterDashboard',
   components: { 
-    Sidebar,  
-    NotificationBell,
+    Sidebar,
     Users, 
     Briefcase,
     Calendar,

@@ -273,4 +273,78 @@ export default {
   .form-panel { padding: 0; }
   .login-card { padding: 32px 24px; }
 }
+
+/* ─── LIGHT MODE OVERRIDES ─── */
+:global(body:not(.dark-mode) .auth-celestial) {
+  background: #f4f7fe !important;
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .welcome-desc) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .trust-item) {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .trust-text strong) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .trust-text span) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .glass-panel) {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+}
+:global(body:not(.dark-mode) .btn-back-celestial) {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #00A7E1;
+}
+:global(body:not(.dark-mode) .btn-back-celestial:hover) {
+  background: rgba(0, 0, 0, 0.06);
+  color: #008cc0;
+}
+:global(body:not(.dark-mode) .card-header h2) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .card-header p) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .role-card-premium) {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .role-card-premium:hover) {
+  background: rgba(0, 167, 225, 0.06);
+  border-color: rgba(0, 167, 225, 0.4);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .role-meta h3) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .role-meta p) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .role-arrow) {
+  color: rgba(0, 0, 0, 0.25);
+}
+:global(body:not(.dark-mode) .divider::before),
+:global(body:not(.dark-mode) .divider::after) {
+  background: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .divider span) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .register-link) {
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #475569;
+}
+:global(body:not(.dark-mode) .register-link:hover) {
+  border-color: rgba(0, 0, 0, 0.2);
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.02);
+}
 </style>

@@ -19,7 +19,8 @@ namespace Application.DTOs.Auth
         public required string Email { get; set; }
 
         [Required]
-        [MinLength(6)]
+        [MinLength(8)]
+        [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$", ErrorMessage = "Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.")]
         public required string Password { get; set; }
 
         [Required]

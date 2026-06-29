@@ -316,8 +316,7 @@ export default {
     languageOptions() {
       return [
         { value: 'fr', label: 'Français (France)' },
-        { value: 'en', label: 'English (UK)' },
-        { value: 'ar', label: 'العربية (TN)' }
+        { value: 'en', label: 'English (UK)' }
       ]
     },
     sidebarVars() {
@@ -378,7 +377,7 @@ export default {
         }
         
         if (data.avatarUrl) {
-          const apiBase = api.defaults.baseURL || 'http://localhost:5000/api'
+          const apiBase = api.defaults.baseURL || '/api'
           this.profile.avatar = data.avatarUrl.startsWith('http') 
             ? data.avatarUrl 
             : `${apiBase.replace('/api', '')}${data.avatarUrl}`
@@ -397,7 +396,7 @@ export default {
         const res = await api.post('/profile/avatar', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
-        const apiBase = api.defaults.baseURL || 'http://localhost:5000/api'
+        const apiBase = api.defaults.baseURL || '/api'
         this.authStore.fetchUser()
         this.showToast(this.$t('notifications.avatarUpdate'), 'success')
       } catch (err) {

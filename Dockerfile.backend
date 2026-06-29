@@ -1,0 +1,35 @@
+# ============================================================
+# NovaHire Backend (.NET 10) — Dockerfile
+# Platform: Render (Linux container)
+# ============================================================
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /source
+
+# Copy solution and restore
+COPY Backend/src/API/API.csproj ./Backend/src/API/
+COPY Backend/src/Application/Application.csproj ./Backend/src/Application/
+COPY Backend/src/Domain/Domain.csproj ./Backend/src/Domain/
+COPY Backend/src/Infrastructure/Infrastructure.csproj ./Backend/src/Infrastructure/
+
+# Restore all projects
+RUN dotnet restore ./Backend/src/API/API.csproj
+
+# Copy all source
+COPY Backend/src/ ./Backend/src/
+
+# Publish
+RUN dotnet publish ./Backend/src/API/API.csproj -c Release -o /app/publish --no-restore
+
+# ── Runtime image ─────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+EXPOSE 5000
+
+ENV ASPNETCORE_URLS=http://+:5000
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+ENTRYPOINT ["dotnet", "API.dll"]

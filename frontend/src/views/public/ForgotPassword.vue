@@ -285,4 +285,84 @@ export default {
   .auth-layout { grid-template-columns: 1fr; max-width: 480px; }
   .welcome-panel { display: none; }
 }
+
+/* ─── LIGHT MODE OVERRIDES ─── */
+:global(body:not(.dark-mode) .auth-celestial) {
+  background: #f4f7fe !important;
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .welcome-desc) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .trust-item) {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .trust-text strong) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .trust-text span) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .glass-panel) {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+}
+:global(body:not(.dark-mode) .btn-back) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .btn-back:hover) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .card-header h2) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .card-header p) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .field label) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .input-shell input) {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .input-shell input::placeholder) {
+  color: rgba(0, 0, 0, 0.45);
+}
+:global(body:not(.dark-mode) .input-shell svg) {
+  color: rgba(0, 0, 0, 0.4);
+}
+:global(body:not(.dark-mode) .divider::before),
+:global(body:not(.dark-mode) .divider::after) {
+  background: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .divider span) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .register-link) {
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #475569;
+}
+:global(body:not(.dark-mode) .register-link:hover) {
+  border-color: rgba(0, 0, 0, 0.2);
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.02);
+}
+:global(body:not(.dark-mode) .success-state h3) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .success-state p) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .secondary-btn) {
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #475569;
+}
+:global(body:not(.dark-mode) .secondary-btn:hover) {
+  background: rgba(0, 0, 0, 0.02);
+  color: #0f172a;
+}
 </style>

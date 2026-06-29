@@ -290,8 +290,8 @@ const barOptions = {
   indexAxis: 'y',
   plugins: { legend: { display: false } },
   scales: {
-    x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
-    y: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: '#f8fafc' } }
+    x: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.1)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+    y: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: '#94a3b8' } }
   }
 }
 

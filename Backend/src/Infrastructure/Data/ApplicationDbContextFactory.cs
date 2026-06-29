@@ -7,8 +7,8 @@ using Application.Interfaces;
 namespace Infrastructure.Data
 {
     /// <summary>
-    /// No-op implementation of ICurrentUserService for design-time (EF migrations).
-    /// SuperAdmin role ensures all global query filters are bypassed during migrations.
+    /// Implémentation factice (no-op) de ICurrentUserService pour le temps de conception (EF Migrations).
+    /// Le rôle SuperAdmin garantit le contournement de tous les filtres de requête globaux de multi-tenancy lors des migrations.
     /// </summary>
     internal class DesignTimeCurrentUserService : ICurrentUserService
     {
@@ -18,10 +18,17 @@ namespace Infrastructure.Data
         public bool IsAuthenticated => false;
     }
 
-    // Design-time factory for EF Core tools. Reads connection string from DB_CONNECTION env var
-    // or falls back to a sensible development default.
+    /// <summary>
+    /// Fabrique de contexte de base de données utilisée en temps de conception par les outils de ligne de commande d'Entity Framework Core.
+    /// Lit la chaîne de connexion depuis la variable d'environnement DB_CONNECTION ou utilise une valeur par défaut de développement.
+    /// </summary>
     public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
     {
+        /// <summary>
+        /// Crée une nouvelle instance de <see cref="ApplicationDbContext"/> pour le design-time.
+        /// </summary>
+        /// <param name="args">Arguments passés par les outils de CLI d'EF Core.</param>
+        /// <returns>Une instance configurée de <see cref="ApplicationDbContext"/>.</returns>
         public ApplicationDbContext CreateDbContext(string[] args)
         {
             var builder = new DbContextOptionsBuilder<ApplicationDbContext>();

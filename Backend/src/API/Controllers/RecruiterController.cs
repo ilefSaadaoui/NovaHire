@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Application.DTOs.Recruiter;
 using Application.Interfaces;
+using Application.Services;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Data;
@@ -14,9 +15,16 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Contrôleur principal pour l'espace Recruteur.
+    /// Fournit les services indispensables pour la gestion quotidienne : statistiques,
+    /// invitations, dossiers candidats, examens IA, guide d'entretien interactif, notations,
+    /// envoi de quiz et de courriels personnalisés de proposition ou de refus.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Policy = "RecruiterOrAbove")]
@@ -33,6 +41,7 @@ namespace API.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly ApplicationDbContext _db;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<RecruiterController> _logger;
 
         public RecruiterController(
             IJobOfferRepository jobOfferRepository,
@@ -45,7 +54,8 @@ namespace API.Controllers
             IExportService exportService,
             IWebHostEnvironment environment,
             ApplicationDbContext db,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ILogger<RecruiterController> logger)
         {
             _jobOfferRepository = jobOfferRepository;
             _jobApplicationRepository = jobApplicationRepository;
@@ -58,6 +68,7 @@ namespace API.Controllers
             _environment = environment;
             _db = db;
             _configuration = configuration;
+            _logger = logger;
         }
 
         private Guid GetCompanyId()
@@ -80,6 +91,13 @@ namespace API.Controllers
             return userId;
         }
 
+        /// <summary>
+        /// Récupère les données statistiques du tableau de bord RH pour le recruteur connecté.
+        /// Propose des filtres de personnalisation (mes offres uniquement) ou de période.
+        /// </summary>
+        /// <param name="personal">Si vrai, filtre uniquement sur les offres créées par le recruteur de session.</param>
+        /// <param name="period">Fenêtre de temps (day, week, month).</param>
+        /// <param name="section">Section spécifique du tableau de bord (optionnelle).</param>
         [HttpGet("dashboard-stats")]
         public async Task<IActionResult> GetDashboardStats(
             [FromQuery] bool personal = false,
@@ -370,6 +388,9 @@ namespace API.Controllers
 
 
 
+        /// <summary>
+        /// Récupère la liste chronologique de tous les entretiens planifiés pour l'entreprise.
+        /// </summary>
         [HttpGet("interviews")]
         public async Task<ActionResult<IEnumerable<InterviewDto>>> GetInterviews()
         {
@@ -394,11 +415,11 @@ namespace API.Controllers
                         : "Inconnu",
                     JobTitle = i.JobApplication?.JobOffer?.Title ?? "N/A",
                     ScheduledAt = i.ScheduledAt,
-                    Type = i.Type,
+                    Type = i.Type ?? "visio",
                     LocationOrLink = i.LocationOrLink,
                     Message = i.Message,
                     Status = i.Status.ToString(),
-                    Color = i.Type switch
+                    Color = (i.Type ?? "visio").ToLower() switch
                     {
                         "visio" => "#0ea5e9",
                         "phone" => "#8b5cf6",
@@ -413,10 +434,13 @@ namespace API.Controllers
             {
                 Console.WriteLine($"[ERROR] GetInterviews: {ex.Message}");
                 Console.WriteLine(ex.StackTrace);
-                return StatusCode(500, ex.Message);
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
+        /// <summary>
+        /// Récupère les collègues membres de l'équipe RH de l'entreprise.
+        /// </summary>
         [HttpGet("team")]
         public async Task<IActionResult> GetTeamMembers()
         {
@@ -446,6 +470,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Invite un nouveau collaborateur recruteur en lui générant des identifiants d'accès.
+        /// Uniquement accessible aux administrateurs de l'entreprise ou rôles supérieurs.
+        /// </summary>
+        /// <param name="dto">Les coordonnées et assignation départementale du nouveau recruteur.</param>
         [HttpPost("invite")]
         [Authorize(Policy = "CompanyAdminOrAbove")]
         public async Task<IActionResult> InviteRecruiter([FromBody] InviteRecruiterDto dto)
@@ -544,6 +573,10 @@ namespace API.Controllers
                 .Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
+        /// <summary>
+        /// Récupère les candidatures reçues par l'entreprise, éventuellement filtrées par offre d'emploi spécifique.
+        /// </summary>
+        /// <param name="jobOfferId">Identifiant unique de l'offre d'emploi (optionnel).</param>
         [HttpGet("applications")]
         public async Task<IActionResult> GetApplications([FromQuery] Guid? jobOfferId)
         {
@@ -592,6 +625,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Récupère le profil d'évaluation complet d'un candidat par l'ID de sa candidature.
+        /// Compte les évaluations, compile son historique d'activités, et récupère ses réponses.
+        /// </summary>
+        /// <param name="id">Identifiant de la candidature.</param>
         [HttpGet("applications/{id}")]
         public async Task<IActionResult> GetCandidateProfile(Guid id)
         {
@@ -602,6 +640,11 @@ namespace API.Controllers
 
                 var companyId = GetCompanyId();
                 if (app.JobOffer?.CompanyId != companyId) return Forbid();
+
+                // Check if a quiz has been generated for this offer
+                var hasQuizGenerated = await _db.Quizzes!
+                    .IgnoreQueryFilters()
+                    .AnyAsync(q => q.JobOfferId == app.JobOfferId && q.IsActive);
 
                 // Fetch interviews for this application
                 var interviews = await _db.Interviews!
@@ -751,6 +794,7 @@ namespace API.Controllers
                 var dto = new CandidateProfileDto
                 {
                     Id = app.Id,
+                    JobOfferId = app.JobOfferId,
                     FullName = app.Candidate != null ? $"{app.Candidate.FirstName} {app.Candidate.LastName}" : "Candidat Anonyme",
                     Email = app.Candidate?.Email ?? string.Empty,
                     Phone = app.Candidate?.PhoneNumber ?? "—",
@@ -846,7 +890,8 @@ namespace API.Controllers
                     MyRating = app.Ratings?.FirstOrDefault(r => r.RecruiterId == GetUserId())?.Score,
                     QuizScore = app.QuizScore,
                     QuizSent = app.QuizSent,
-                    QuizExpiresAt = app.QuizExpiresAt
+                    QuizExpiresAt = app.QuizExpiresAt,
+                    HasQuizGenerated = hasQuizGenerated
                 };
                 return Ok(dto);
             }
@@ -856,41 +901,57 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Met à jour l'étape (statut) d'avancement d'une candidature.
+        /// </summary>
+        /// <param name="id">L'identifiant de la candidature.</param>
+        /// <param name="dto">La nouvelle étape demandée.</param>
         [HttpPatch("applications/{id}/stage")]
         public async Task<IActionResult> UpdateApplicationStage(Guid id, [FromBody] UpdateStageDto dto)
         {
             try
             {
-                // Ensure we load the application with its offer to verify company ownership
-                var app = await _jobApplicationRepository.GetByIdWithJobOfferAsync(id);
-                if (app == null) return NotFound();
-
                 var companyId = GetCompanyId();
-                if (app.JobOffer?.CompanyId != companyId) return Forbid();
 
-                // Simple validation of enum
+                // Simple validation of enum first (before hitting DB)
                 if (!Enum.TryParse<ApplicationStatus>(dto.Stage, true, out var newStatus))
                 {
-                    return BadRequest("Stage invalide");
+                    return BadRequest(new { message = "Stage invalide" });
                 }
+
+                // Load ONLY the application (no AIAnalysis, no owned entities) to avoid EF tracking conflicts
+                var app = await _db.JobApplications
+                    .Include(a => a.JobOffer)
+                    .FirstOrDefaultAsync(a => a.Id == id);
+
+                if (app == null) return NotFound();
+                if (app.JobOffer?.CompanyId != companyId) return Forbid();
 
                 app.Status = newStatus;
                 app.UpdatedAt = DateTime.UtcNow;
 
-                // IMPORTANT: We do NOT call UpdateAsync(app) here because it calls _context.Update(app),
-                // which marks all properties as modified. If AIAnalysis was not loaded (it's null in app),
-                // EF Core would null out the analysis columns in the database.
-                // By just calling SaveChangesAsync on the tracked entity, EF Core only updates changed columns.
-                await _jobApplicationRepository.SaveChangesAsync();
+                // Sync interview statuses if needed
+                var interviews = await _db.Interviews!
+                    .Where(i => i.JobApplicationId == id)
+                    .ToListAsync();
+                InterviewApplicationSync.SyncInterviewsFromApplicationStatus(newStatus, interviews);
+
+                await _db.SaveChangesAsync();
 
                 return Ok(new { message = "Statut mis à jour" });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                Console.WriteLine($"[UpdateApplicationStage] Error for app {id}: {ex.Message}");
+                return StatusCode(500, new { message = ex.Message });
             }
         }
 
+        /// <summary>
+        /// Déclenche l'analyse intelligente IA du CV du candidat.
+        /// Extrait la formation, l'expérience et calcule le score de matching par rapport aux exigences de l'offre.
+        /// </summary>
+        /// <param name="id">Identifiant de la candidature.</param>
         [HttpPost("applications/{id}/analyze")]
         public async Task<IActionResult> AnalyzeApplication(Guid id)
         {
@@ -1013,17 +1074,25 @@ namespace API.Controllers
                         extData.Certifications = analysisResult.ExtractedData.Certifications?.Where(c => c != null).ToList() ?? new List<string>();
                     }
 
-                    if (app.Status == ApplicationStatus.Submitted)
+                    // Auto-reject: if threshold is set and score is below it,
+                    // apply rejection regardless of current status (Submitted or UnderReview),
+                    // unless the application is already in a terminal/advanced state.
+                    var isTerminalStatus = app.Status == ApplicationStatus.Accepted
+                        || app.Status == ApplicationStatus.OfferSent
+                        || app.Status == ApplicationStatus.Interviewed;
+
+                    if (!isTerminalStatus)
                     {
-                        // Auto-reject: if threshold is set and score is below it
                         if (offer.AutoRejectThreshold > 0 && analysisResult.OverallScore < offer.AutoRejectThreshold)
                         {
                             app.Status = ApplicationStatus.Rejected;
                         }
-                        else
+                        else if (app.Status == ApplicationStatus.Submitted)
                         {
+                            // Only advance to UnderReview if still at initial Submitted stage
                             app.Status = ApplicationStatus.UnderReview;
                         }
+                        // If already UnderReview/Shortlisted/Interview and score >= threshold: keep current status
                     }
 
                     // 4. Perform a surgical update
@@ -1034,7 +1103,9 @@ namespace API.Controllers
                     {
                         message = "Analyse terminée avec succès",
                         analysis = app.AIAnalysis,
-                        score = app.AiScore
+                        score = app.AiScore,
+                        status = (int)app.Status,
+                        autoRejected = app.Status == ApplicationStatus.Rejected && offer.AutoRejectThreshold > 0 && analysisResult.OverallScore < offer.AutoRejectThreshold
                     });
                 }
                 catch (Exception aiEx)
@@ -1070,6 +1141,11 @@ namespace API.Controllers
             return null;
         }
 
+        /// <summary>
+        /// Met à jour les notes d'évaluation privées du recruteur sur un dossier candidat.
+        /// </summary>
+        /// <param name="id">Identifiant de la candidature.</param>
+        /// <param name="dto">Les nouvelles notes.</param>
         [HttpPatch("applications/{id}/notes")]
         public async Task<IActionResult> UpdateRecruiterNotes(Guid id, [FromBody] UpdateNotesDto dto)
         {
@@ -1099,6 +1175,12 @@ namespace API.Controllers
 
         public class UpdateNotesDto { public string Notes { get; set; } = string.Empty; }
 
+        /// <summary>
+        /// Permet à un recruteur de modifier manuellement les données extraites du CV par l'IA.
+        /// Recalcule ensuite le score global de matching en tenant compte des corrections manuelles.
+        /// </summary>
+        /// <param name="id">Identifiant de la candidature.</param>
+        /// <param name="dto">Les données corrigées (expériences, formation, compétences).</param>
         [HttpPatch("applications/{id}/extracted-data")]
         public async Task<IActionResult> UpdateExtractedData(Guid id, [FromBody] UpdateExtractedDataDto dto)
         {
@@ -1199,6 +1281,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Obtient les statistiques avancées d'analyse de performance (matching, conversion, compétences clés).
+        /// </summary>
+        /// <param name="jobOfferId">Identifiant d'offre optionnel.</param>
         [HttpGet("analytics")]
         public async Task<IActionResult> GetAnalytics([FromQuery] Guid? jobOfferId)
         {
@@ -1271,6 +1357,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Génère et télécharge le rapport PDF global de performance d'une offre d'emploi.
+        /// </summary>
+        /// <param name="jobOfferId">ID de l'offre d'emploi concernée.</param>
         [HttpGet("export/pdf")]
         public async Task<IActionResult> ExportPdf([FromQuery] Guid jobOfferId)
         {
@@ -1292,6 +1382,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Génère et télécharge le rapport Excel récapitulatif d'une offre d'emploi et de ses candidats.
+        /// </summary>
+        /// <param name="jobOfferId">ID de l'offre d'emploi concernée.</param>
         [HttpGet("export/excel")]
         public async Task<IActionResult> ExportExcel([FromQuery] Guid jobOfferId)
         {
@@ -1311,6 +1405,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Génère et télécharge la fiche profil PDF détaillée d'un candidat spécifique.
+        /// </summary>
+        /// <param name="applicationId">ID unique de la candidature.</param>
         [HttpGet("applications/{applicationId}/export-pdf")]
         public async Task<IActionResult> ExportCandidatePdf(Guid applicationId)
         {
@@ -1333,6 +1431,9 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Récupère les données publiques de l'entreprise connectée.
+        /// </summary>
         [HttpGet("company-info")]
         public async Task<IActionResult> GetCompanyInfo()
         {
@@ -1349,6 +1450,11 @@ namespace API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        /// <summary>
+        /// Ajoute un nouveau commentaire collaboratif interne sur le dossier d'un candidat.
+        /// </summary>
+        /// <param name="id">ID unique de la candidature.</param>
+        /// <param name="request">Le texte du commentaire.</param>
         [HttpPost("applications/{id}/comments")]
         public async Task<IActionResult> AddComment(Guid id, [FromBody] CommentRequest request)
         {
@@ -1400,6 +1506,12 @@ namespace API.Controllers
             if (span.TotalHours < 24) return $"il y a {(int)span.TotalHours} h";
             return $"le {dateTime:dd/MM}";
         }
+        /// <summary>
+        /// Planifie un entretien avec un candidat (en visioconférence, en personne ou par téléphone).
+        /// Envoie automatiquement un e-mail d'invitation avec calendrier ICS en pièce jointe.
+        /// </summary>
+        /// <param name="applicationId">ID de la candidature concernée.</param>
+        /// <param name="dto">Les paramètres de l'entretien (date, heure, type, message personnalisé).</param>
         [HttpPost("applications/{applicationId}/interviews")]
         public async Task<IActionResult> ScheduleInterview(Guid applicationId, [FromBody] InterviewCreateDto dto)
         {
@@ -1411,11 +1523,34 @@ namespace API.Controllers
 
             if (application == null) return NotFound("Candidature non trouvée.");
 
-            var scheduledAt = DateTime.SpecifyKind(dto.Date.Date.Add(TimeSpan.Parse(dto.Time)), DateTimeKind.Utc);
+            // Parsing robuste de la date (format ISO yyyy-MM-dd envoyé par le navigateur)
+            _logger.LogInformation("ScheduleInterview reçu: Date='{Date}', Time='{Time}', Type='{Type}'", dto.Date, dto.Time, dto.Type);
 
-            if (scheduledAt < DateTime.UtcNow.AddMinutes(-5))
+            if (!DateTime.TryParseExact(dto.Date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsedDate))
             {
-                return BadRequest("Impossible de planifier un entretien dans le passé.");
+                _logger.LogWarning("Format de date invalide: '{Date}'", dto.Date);
+                return BadRequest(new { message = $"Format de date invalide : '{dto.Date}'. Attendu : yyyy-MM-dd." });
+            }
+
+            if (!TimeSpan.TryParse(dto.Time, out var parsedTime))
+            {
+                _logger.LogWarning("Format d'heure invalide: '{Time}'", dto.Time);
+                return BadRequest(new { message = $"Format d'heure invalide : '{dto.Time}'. Attendu : HH:mm." });
+            }
+
+            var scheduledAt = DateTime.SpecifyKind(parsedDate.Date.Add(parsedTime), DateTimeKind.Utc);
+            _logger.LogInformation("scheduledAt calculé: {ScheduledAt}, UtcNow: {UtcNow}", scheduledAt, DateTime.UtcNow);
+
+            // Si un entretien du même type est déjà planifié, on l'annule automatiquement
+            var existingSameType = await _db.Interviews!
+                .Where(i => i.JobApplicationId == applicationId && 
+                           i.Type == dto.Type && 
+                           (i.Status == InterviewStatus.Planned || i.Status == InterviewStatus.Rescheduled))
+                .ToListAsync();
+
+            foreach (var old in existingSameType)
+            {
+                old.Status = InterviewStatus.Cancelled;
             }
 
             var interview = new Interview
@@ -1425,7 +1560,11 @@ namespace API.Controllers
                 RecruiterId = _currentUserService.UserId ?? Guid.Empty,
                 ScheduledAt = scheduledAt,
                 Type = dto.Type,
-                LocationOrLink = dto.Type == "visio" ? "Lien envoyé par e-mail" : "À définir",
+                LocationOrLink = dto.Type == "visio" 
+                    ? "Lien envoyé par e-mail" 
+                    : dto.Type == "phone" 
+                        ? (application.Candidate?.PhoneNumber ?? "Téléphone du candidat") 
+                        : "À définir",
                 Message = dto.Message,
                 Status = InterviewStatus.Planned,
                 CreatedAt = DateTime.UtcNow
@@ -1452,19 +1591,16 @@ namespace API.Controllers
             await _db.SaveChangesAsync();
 
             // Envoi de l'e-mail
-            try
+            var typeLabels = new Dictionary<string, string>
             {
-                var typeLabels = new Dictionary<string, string>
-                {
-                    { "visio", "Visioconférence" },
-                    { "phone", "Appel Téléphonique" },
-                    { "onsite", "En Personne" }
-                };
-                var formatLabel = typeLabels.ContainsKey(dto.Type) ? typeLabels[dto.Type] : dto.Type;
-                scheduledAt = DateTime.SpecifyKind(dto.Date.Date.Add(TimeSpan.Parse(dto.Time)), DateTimeKind.Utc);
-                var messageHtml = System.Net.WebUtility.HtmlEncode(dto.Message).Replace("\n", "<br>");
+                { "visio", "Visioconférence" },
+                { "phone", "Appel Téléphonique" },
+                { "onsite", "En Personne" }
+            };
+            var formatLabel = typeLabels.ContainsKey(dto.Type) ? typeLabels[dto.Type] : dto.Type;
+            var messageHtml = System.Net.WebUtility.HtmlEncode(dto.Message).Replace("\n", "<br>");
 
-                var emailBody = $@"
+            var emailBody = $@"
                 <div style='font-family: ""Inter"", -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8fafc; padding: 40px 20px;'>
                     <div style='background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;'>
                         <div style='background: linear-gradient(135deg, #0ea5e9, #06b6d4); padding: 32px; text-align: center;'>
@@ -1473,8 +1609,8 @@ namespace API.Controllers
                         <div style='padding: 40px;'>
                             <div style='background-color: #f0f9ff; border-left: 4px solid #0ea5e9; border-radius: 8px; padding: 20px; margin-bottom: 24px;'>
                                 <p style='margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;'>Détails de l'entretien</p>
-                                <p style='margin: 4px 0; font-size: 15px; color: #0f172a;'><strong>Date :</strong> {scheduledAt:dddd dd MMMM yyyy}</p>
-                                <p style='margin: 4px 0; font-size: 15px; color: #0f172a;'><strong>Heure :</strong> {scheduledAt:HH:mm}</p>
+                                <p style='margin: 4px 0; font-size: 15px; color: #0f172a;'><strong>Date :</strong> {scheduledAt.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))}</p>
+                                <p style='margin: 4px 0; font-size: 15px; color: #0f172a;'><strong>Heure :</strong> {scheduledAt.ToString("HH:mm")}</p>
                                 <p style='margin: 4px 0; font-size: 15px; color: #0f172a;'><strong>Format :</strong> {formatLabel}</p>
                             </div>
                             <div style='font-size: 15px; color: #334155; line-height: 1.7;'>
@@ -1487,25 +1623,30 @@ namespace API.Controllers
                     </div>
                 </div>";
 
-                await _emailService.SendInterviewInvitationWithCalendarAsync(
-                    application.Candidate!.Email,
-                    application.Candidate!.FirstName,
-                    dto.Subject,
-                    emailBody,
-                    scheduledAt,
-                    60, // 1 hour duration
-                    dto.Type == "visio" ? "Lien Visioconférence" : "Bureaux de l'entreprise"
-                );
-            }
-            catch (Exception ex)
+            var emailSent = await _emailService.SendInterviewInvitationWithCalendarAsync(
+                application.Candidate!.Email,
+                application.Candidate!.FirstName,
+                dto.Subject,
+                emailBody,
+                scheduledAt,
+                60, // 1 hour duration
+                dto.Type == "visio" ? "Lien Visioconférence" : "Bureaux de l'entreprise"
+            );
+
+            if (!emailSent)
             {
-                // On ne bloque pas si l'email échoue, mais on log l'erreur
-                Console.WriteLine($"Erreur envoi email: {ex.Message}");
+                _logger.LogWarning("L'envoi de l'invitation e-mail a échoué pour {CandidateEmail}, mais l'entretien a bien été enregistré en base.", application.Candidate!.Email);
+                return Ok(new { message = "Entretien planifié avec succès (e-mail non envoyé — vérifiez la configuration SMTP).", emailSent = false });
             }
 
-            return Ok(new { message = "Entretien planifié avec succès" });
+            return Ok(new { message = "Entretien planifié avec succès", emailSent = true });
         }
 
+        /// <summary>
+        /// Modifie les détails logistiques d'un entretien existant.
+        /// </summary>
+        /// <param name="id">ID unique de l'entretien.</param>
+        /// <param name="dto">Les nouvelles informations.</param>
         [HttpPatch("interviews/{id}")]
         public async Task<IActionResult> UpdateInterview(Guid id, [FromBody] InterviewUpdateDto dto)
         {
@@ -1517,14 +1658,54 @@ namespace API.Controllers
 
             if (interview == null) return NotFound("Entretien non trouvé.");
 
-            interview.LocationOrLink = dto.LocationOrLink;
-            interview.Message = dto.Message;
+            if (!string.IsNullOrWhiteSpace(dto.Status))
+            {
+                if (!Enum.TryParse<InterviewStatus>(dto.Status, true, out var interviewStatus))
+                    return BadRequest("Statut d'entretien invalide.");
+
+                interview.Status = interviewStatus;
+                if (interview.JobApplication != null)
+                    InterviewApplicationSync.SyncApplicationFromInterviewStatus(
+                        interview.JobApplication, interviewStatus);
+            }
+
+            if (dto.LocationOrLink != null)
+                interview.LocationOrLink = dto.LocationOrLink;
+            if (dto.Message != null)
+                interview.Message = dto.Message;
+
+            if (dto.Date.HasValue && !string.IsNullOrWhiteSpace(dto.Time))
+            {
+                if (!TimeSpan.TryParse(dto.Time.Trim(), out var timeOfDay))
+                    return BadRequest("Format d'heure invalide (attendu HH:mm).");
+
+                var scheduledAt = DateTime.SpecifyKind(
+                    dto.Date.Value.Date.Add(timeOfDay),
+                    DateTimeKind.Utc);
+
+                if (scheduledAt < DateTime.UtcNow.AddMinutes(-5))
+                    return BadRequest("Impossible de planifier un entretien dans le passé.");
+
+                interview.ScheduledAt = scheduledAt;
+                if (interview.Status is InterviewStatus.Planned or InterviewStatus.Rescheduled)
+                    interview.Status = InterviewStatus.Rescheduled;
+            }
+
             interview.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
 
-            return Ok(new { message = "Entretien mis à jour avec succès" });
+            return Ok(new
+            {
+                message = "Entretien mis à jour avec succès",
+                scheduledAt = interview.ScheduledAt
+            });
         }
+        /// <summary>
+        /// Met à jour de façon interactive la liste des questions et notes du guide d'entretien du candidat.
+        /// </summary>
+        /// <param name="id">ID de la candidature.</param>
+        /// <param name="questions">La liste des questions révisées.</param>
         [HttpPatch("applications/{id}/interview-guide")]
         public async Task<IActionResult> UpdateInterviewGuide(Guid id, [FromBody] List<InterviewQuestionDto> questions)
         {
@@ -1557,6 +1738,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Permet à un recruteur de laisser ou mettre à jour une évaluation (note sur 5 et appréciation).
+        /// </summary>
+        /// <param name="id">ID de la candidature.</param>
+        /// <param name="request">La note et le commentaire d'évaluation.</param>
         [HttpPost("applications/{id}/ratings")]
         public async Task<IActionResult> AddRating(Guid id, [FromBody] ApplicationRatingRequest request)
         {
@@ -1604,6 +1790,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Compare les profils de deux candidats en confrontant leurs scores et compétences clés.
+        /// </summary>
+        /// <param name="ids">Les IDs uniques des deux candidatures séparés par une virgule.</param>
         [HttpGet("applications/compare")]
         public async Task<IActionResult> CompareCandidates([FromQuery] string ids)
         {
@@ -1617,13 +1807,35 @@ namespace API.Controllers
                     .ToList();
 
                 if (guidIds.Count == 0) return BadRequest("IDs invalides.");
+                if (guidIds.Count != 2) return BadRequest("La comparaison nécessite exactement 2 candidats.");
 
                 var companyId = GetCompanyId();
                 var apps = await _db.JobApplications!
                     .Include(a => a.Candidate)
                     .Include(a => a.JobOffer)
+                    .Include(a => a.AIAnalysis)
                     .Where(a => guidIds.Contains(a.Id) && a.JobOffer!.CompanyId == companyId)
                     .ToListAsync();
+
+                if (apps.Count != 2)
+                    return NotFound(new { message = "Une ou plusieurs candidatures sont introuvables." });
+
+                var withoutAnalysis = apps.Where(a =>
+                    !a.AiScore.HasValue &&
+                    (a.AIAnalysis == null ||
+                     (a.AIAnalysis.OverallScore <= 0 &&
+                      (a.AIAnalysis.IdentifiedSkills == null || a.AIAnalysis.IdentifiedSkills.Count == 0))))
+                    .ToList();
+
+                if (withoutAnalysis.Count > 0)
+                {
+                    var names = string.Join(", ", withoutAnalysis.Select(a =>
+                        a.Candidate != null ? $"{a.Candidate.FirstName} {a.Candidate.LastName}" : "Candidat"));
+                    return BadRequest(new
+                    {
+                        message = $"Analyse IA requise avant la comparaison. Lancez l'analyse CV pour : {names}."
+                    });
+                }
 
                 var comparison = new ComparisonDto
                 {
@@ -1655,6 +1867,10 @@ namespace API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        /// <summary>
+        /// Récupère le quiz d'évaluation associé à une offre d'emploi pour examen interne.
+        /// </summary>
+        /// <param name="id">ID de l'offre d'emploi.</param>
         [HttpGet("job-offers/{id}/quiz")]
         public async Task<IActionResult> GetQuizForOffer(Guid id)
         {
@@ -1698,6 +1914,10 @@ namespace API.Controllers
             public string? Keywords { get; set; }
         }
 
+        /// <summary>
+        /// Fait appel à l'IA pour générer automatiquement une fiche descriptive de poste à partir de son titre et mots-clés.
+        /// </summary>
+        /// <param name="dto">Le titre du poste cible et mots-clés à incorporer.</param>
         [HttpPost("job-offers/ai/generate-description")]
         public async Task<IActionResult> GenerateJobDescription([FromBody] GenerateJDDto dto)
         {
@@ -1715,6 +1935,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Envoie massivement le quiz d'évaluation à tous les candidats présélectionnés de cette offre.
+        /// </summary>
+        /// <param name="id">ID de l'offre d'emploi concernée.</param>
         [HttpPost("job-offers/{id}/send-quiz-to-all")]
         public async Task<IActionResult> SendQuizToAll(Guid id)
         {
@@ -1760,6 +1984,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Supprime définitivement un quiz du système.
+        /// </summary>
+        /// <param name="id">L'identifiant du quiz.</param>
         [HttpDelete("quizzes/{id}")]
         public async Task<IActionResult> DeleteQuiz(Guid id)
         {
@@ -1783,6 +2011,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Envoie de façon unitaire l'invitation à passer le quiz technique de compétences à un candidat donné.
+        /// </summary>
+        /// <param name="id">ID de la candidature ciblée.</param>
         [HttpPost("applications/{id}/send-quiz-invitation")]
         public async Task<IActionResult> SendQuizInvitation(Guid id)
         {
@@ -1820,6 +2052,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Envoie des invitations de quiz en lot à plusieurs candidatures sélectionnées.
+        /// </summary>
+        /// <param name="applicationIds">La liste des identifiants des candidatures concernées.</param>
         [HttpPost("applications/bulk-send-quiz")]
         public async Task<IActionResult> BulkSendQuiz([FromBody] List<Guid> applicationIds)
         {
@@ -1870,6 +2106,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Envoie manuellement le lien public de passage de test technique à une adresse e-mail.
+        /// </summary>
+        /// <param name="request">L'adresse e-mail cible et l'offre associée.</param>
         [HttpPost("quiz/send-invitation")]
         public async Task<IActionResult> SendManualQuizInvitation([FromBody] QuizInvitationRequest request)
         {
@@ -1902,6 +2142,11 @@ namespace API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        /// <summary>
+        /// Envoie un e-mail de refus personnalisé ou rédigé de façon bienveillante par l'IA.
+        /// </summary>
+        /// <param name="id">ID de la candidature.</param>
+        /// <param name="request">La raison de refus facultative et le drapeau d'utilisation de l'IA.</param>
         [HttpPost("applications/{id}/send-rejection-email")]
         public async Task<IActionResult> SendRejectionEmail(Guid id, [FromBody] RejectionRequest request)
         {
@@ -1942,6 +2187,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Envoie par e-mail la lettre d'offre de proposition d'embauche finalisée au candidat.
+        /// </summary>
+        /// <param name="id">ID de la candidature.</param>
+        /// <param name="request">Le contenu formatté HTML de la proposition.</param>
         [HttpPost("applications/{id}/send-offer-email")]
         public async Task<IActionResult> SendOfferEmail(Guid id, [FromBody] SendOfferEmailRequest request)
         {
@@ -1975,6 +2225,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Envoie un e-mail au candidat pour l'informer que son dossier a été présélectionné pour la suite.
+        /// </summary>
+        /// <param name="id">ID de la candidature.</param>
         [HttpPost("applications/{id}/send-shortlisted-email")]
         public async Task<IActionResult> SendShortlistedEmail(Guid id)
         {
@@ -2008,6 +2262,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Rédige automatiquement à l'aide de l'IA une proposition d'embauche premium personnalisée.
+        /// </summary>
+        /// <param name="id">ID de la candidature.</param>
+        /// <param name="request">Les paramètres financiers et logistiques (salaire, avantages, date de début).</param>
         [HttpPost("applications/{id}/generate-offer-letter")]
         public async Task<IActionResult> GenerateOfferLetter(Guid id, [FromBody] OfferLetterRequest request)
         {

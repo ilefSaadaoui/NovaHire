@@ -88,13 +88,13 @@
                 <th class="col-loc">{{ $t('offers.table.location') }}</th>
                 <th class="col-type">{{ $t('offers.table.contract') }}</th>
                 <th class="col-stats">{{ $t('offers.table.candidates') }}</th>
-                <th class="col-date">{{ $t('offers.table.date') }}</th>
+                <th class="col-date">Date de clôture</th>
                 <th class="col-status">{{ $t('offers.table.status') }}</th>
                 <th class="col-actions"></th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(offer, index) in filteredOffers" 
+              <tr v-for="(offer, index) in paginatedOffers" 
                   :key="offer.id" 
                   class="table-row-premium anim-stagger-ui" 
                   :style="{ animationDelay: `${0.1 + (index * 0.05)}s` }">
@@ -130,7 +130,10 @@
                   </div>
                 </td>
                 <td>
-                  <span class="date-text-lux">{{ offer.date }}</span>
+                  <span class="date-text-lux" :class="{ 'deadline-soon': offer.deadlineSoon, 'deadline-passed': offer.deadlinePassed }">
+                    <span v-if="offer.deadline">{{ offer.deadline }}</span>
+                    <span v-else style="color: var(--r-text-sub); font-style: italic;">Non définie</span>
+                  </span>
                 </td>
                 <td>
                   <div class="status-indicator-lux" :class="offer.status">
@@ -163,6 +166,14 @@
                             <Copy :size="14" />
                             <span>Copier le lien</span>
                           </button>
+                          <button v-if="offer.status === 'active'" class="menu-item close-btn" @click="closeOffer(offer.id)">
+                            <XCircle :size="14" />
+                            <span>Clôturer</span>
+                          </button>
+                          <button v-if="offer.status === 'closed'" class="menu-item reopen-btn" @click="reopenOffer(offer.id)">
+                            <RefreshCw :size="14" />
+                            <span>Rouvrir</span>
+                          </button>
                           <div class="menu-divider"></div>
                           <button class="menu-item danger-btn" @click="deleteOffer(offer.id)">
                             <Trash2 :size="14" />
@@ -180,7 +191,7 @@
 
         <!-- Cards View -->
         <div v-else class="celestial-grid anim-reveal-up">
-          <div v-for="(offer, index) in filteredOffers" 
+          <div v-for="(offer, index) in paginatedOffers" 
                :key="offer.id" 
                class="offer-card-lux anim-stagger-ui" 
                :style="{ animationDelay: `${0.1 + (index * 0.1)}s` }"
@@ -220,6 +231,14 @@
                         <Copy :size="14" />
                         <span>Copier lien</span>
                       </button>
+                      <button v-if="offer.status === 'active'" class="menu-item close-btn" @click="closeOffer(offer.id)">
+                        <XCircle :size="14" />
+                        <span>Clôturer</span>
+                      </button>
+                      <button v-if="offer.status === 'closed'" class="menu-item reopen-btn" @click="reopenOffer(offer.id)">
+                        <RefreshCw :size="14" />
+                        <span>Rouvrir</span>
+                      </button>
                       <div class="menu-divider"></div>
                       <button class="menu-item danger-btn" @click="deleteOffer(offer.id)">
                         <Trash2 :size="14" />
@@ -256,11 +275,35 @@
                   </div>
                 </div>
               </div>
-              <div class="card-date-lux">
-                {{ offer.date }}
+              <div class="card-date-lux" :class="{ 'deadline-soon': offer.deadlineSoon, 'deadline-passed': offer.deadlinePassed }">
+                <span v-if="offer.deadline">Clôture : {{ offer.deadline }}</span>
+                <span v-else style="font-style: italic;">Date non définie</span>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Pagination & Stats -->
+      <div class="celestial-pagination anim-reveal-up" v-if="filteredOffers.length > 0">
+        <div class="pagination-stats-lux">
+          <div class="stats-icon-wrap"><List :size="16" /></div>
+          <span>Total de <strong>{{ filteredOffers.length }}</strong> offre{{ filteredOffers.length > 1 ? 's' : '' }}</span>
+        </div>
+        <div class="pagination-controls-lux" v-if="totalPages > 1">
+          <button class="btn-page-lux" :disabled="currentPage === 1" @click="currentPage--">
+            <ChevronLeft :size="16" />
+            <span>Précédent</span>
+          </button>
+          <div class="page-indicator-lux">
+            <span class="current">{{ currentPage }}</span>
+            <span class="sep">/</span>
+            <span class="total">{{ totalPages }}</span>
+          </div>
+          <button class="btn-page-lux next" :disabled="currentPage === totalPages" @click="currentPage++">
+            <span>Suivant</span>
+            <ChevronRight :size="16" />
+          </button>
         </div>
       </div>
     </main>
@@ -273,7 +316,8 @@ import Sidebar from '@/components/layout/Sidebar.vue'
 import { 
   Briefcase, Plus, Search, LayoutGrid, List, 
   MoreVertical, Eye, FileEdit, Copy, Trash2, 
-  MapPin, Users 
+  MapPin, Users, ChevronLeft, ChevronRight,
+  XCircle, RefreshCw, Lock
 } from 'lucide-vue-next'
 
 import PremiumSelect from '@/components/common/PremiumSelect.vue'
@@ -288,7 +332,8 @@ export default {
     Sidebar, PremiumSelect,
     Briefcase, Plus, Search, LayoutGrid, List,
     MoreVertical, Eye, FileEdit, Copy, Trash2,
-    MapPin, Users
+    MapPin, Users, ChevronLeft, ChevronRight,
+    XCircle, RefreshCw, Lock
   },
   directives: {
     'click-outside': {
@@ -324,7 +369,9 @@ export default {
       showCreateModal: false,
       isSaving: false,
       activeMenuId: null,
-      offers: []
+      offers: [],
+      currentPage: 1,
+      itemsPerPage: 9
     }
   },
   computed: {
@@ -341,8 +388,8 @@ export default {
         { value: '', label: this.$t('offers.allTypes') },
         { value: 'CDI', label: 'CDI / Full-Time' },
         { value: 'CDD', label: 'CDD / Contract' },
+        { value: 'Temps Partiel', label: 'Temps Partiel' },
         { value: 'Stage', label: 'Stage / Internship' },
-        { value: 'Alternance', label: 'Alternance' },
         { value: 'Freelance', label: 'Freelance' }
       ]
     },
@@ -361,10 +408,23 @@ export default {
         return matchSearch && matchStatus && matchType
       })
     },
+    totalPages() {
+      return Math.ceil(this.filteredOffers.length / this.itemsPerPage) || 1
+    },
+    paginatedOffers() {
+      const start = (this.currentPage - 1) * this.itemsPerPage
+      const end = start + this.itemsPerPage
+      return this.filteredOffers.slice(start, end)
+    },
     sidebarVars() {
       // Returns empty by default as Sidebar now consumes global variables
       return {}
     }
+  },
+  watch: {
+    search() { this.currentPage = 1 },
+    filterStatus() { this.currentPage = 1 },
+    filterType() { this.currentPage = 1 }
   },
   async mounted() {
     await this.fetchOffers()
@@ -373,9 +433,15 @@ export default {
     async fetchOffers() {
       this.isLoading = true
       try {
-        const res = await api.get('/JobOffer')
+        const res = await api.get('/JobOffer', { params: { page: 1, limit: 200 } })
         // Gérer la nouvelle structure paginée: res.data = { data: [...], total, page, limit }
-        const data = res.data.data || []
+        const raw = res.data.data || []
+        const seenIds = new Set()
+        const data = raw.filter(o => {
+          if (!o?.id || seenIds.has(o.id)) return false
+          seenIds.add(o.id)
+          return true
+        })
         this.totalOffers = res.data.total || data.length
         
         this.offers = data.map(o => {
@@ -389,8 +455,8 @@ export default {
           let type = o.type || 'CDI'
           if (type === 'FullTime') type = 'CDI'
           else if (type === 'Contract') type = 'CDD'
+          else if (type === 'PartTime') type = 'Temps Partiel'
           else if (type === 'Internship') type = 'Stage'
-          else if (type === 'Apprenticeship') type = 'Alternance'
 
           return {
             id: o.id,
@@ -400,6 +466,9 @@ export default {
             type: type,
             applications: o.applicationsCount || 0,
             date: o.createdAt ? new Date(o.createdAt).toLocaleDateString('fr-FR') : '—',
+            deadline: o.deadline ? new Date(o.deadline).toLocaleDateString('fr-FR') : null,
+            deadlineSoon: o.deadline ? (new Date(o.deadline) - new Date()) < 7 * 24 * 60 * 60 * 1000 && new Date(o.deadline) > new Date() : false,
+            deadlinePassed: o.deadline ? new Date(o.deadline) < new Date() : false,
             status: status,
             statusLabel: this.getStatusLabel(status),
             shareToken: o.shareToken
@@ -459,6 +528,7 @@ export default {
       }
     },
     async deleteOffer(id) {
+      this.activeMenuId = null
       const modalStore = useModalStore()
       const confirmed = await modalStore.confirm({
         title: 'Supprimer cette offre ?',
@@ -504,12 +574,46 @@ export default {
         return
       }
       const link = `${window.location.origin}/shared-job/${offer.shareToken}`
-      
       navigator.clipboard.writeText(link).then(() => {
         useToastStore().show('Lien copié avec succès !', 'success')
       }).catch(err => {
         console.error('Erreur copie:', err)
       })
+    },
+    async closeOffer(id) {
+      this.activeMenuId = null
+      const modalStore = useModalStore()
+      const confirmed = await modalStore.confirm({
+        title: 'Clôturer cette offre ?',
+        message: 'L\'offre ne sera plus visible pour les candidats. Vous pourrez la rouvrir à tout moment.',
+        confirmText: 'Clôturer',
+        type: 'warning'
+      })
+      if (!confirmed) return
+      try {
+        await api.patch(`/JobOffer/${id}/status`, { status: 'Archived' })
+        this.offers = this.offers.map(o =>
+          o.id === id ? { ...o, status: 'closed', statusLabel: this.getStatusLabel('closed') } : o
+        )
+        this.activeMenuId = null
+        useToastStore().show('Offre clôturée avec succès.', 'success')
+      } catch (err) {
+        console.error('Erreur clôture:', err)
+        useToastStore().show('Erreur lors de la clôture de l\'offre.', 'error')
+      }
+    },
+    async reopenOffer(id) {
+      try {
+        await api.patch(`/JobOffer/${id}/status`, { status: 'Published' })
+        this.offers = this.offers.map(o =>
+          o.id === id ? { ...o, status: 'active', statusLabel: this.getStatusLabel('active') } : o
+        )
+        this.activeMenuId = null
+        useToastStore().show('Offre rouverte avec succès !', 'success')
+      } catch (err) {
+        console.error('Erreur réouverture:', err)
+        useToastStore().show('Erreur lors de la réouverture de l\'offre.', 'error')
+      }
     }
   }
 }
@@ -924,6 +1028,24 @@ export default {
   background: rgba(239, 68, 68, 0.1);
 }
 
+.menu-item.close-btn {
+  color: #f59e0b;
+}
+
+.menu-item.close-btn:hover {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.menu-item.reopen-btn {
+  color: #10b981;
+}
+
+.menu-item.reopen-btn:hover {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
 .menu-divider {
   height: 1px;
   background: var(--r-border);
@@ -1089,6 +1211,106 @@ export default {
   opacity: 0.8;
 }
 
+/* Premium Pagination UX/UI */
+.celestial-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  padding: 16px 24px;
+  background: var(--r-card-bg);
+  border: 1px solid var(--r-border);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.pagination-stats-lux {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--r-text-sub);
+  font-weight: 500;
+}
+
+.pagination-stats-lux strong {
+  color: var(--r-text-main);
+  font-weight: 800;
+}
+
+.stats-icon-wrap {
+  width: 32px;
+  height: 32px;
+  background: var(--r-main-bg);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  border: 1px solid var(--r-border);
+}
+
+.pagination-controls-lux {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--r-main-bg);
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid var(--r-border);
+}
+
+.btn-page-lux {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--r-text-main);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-page-lux:hover:not(:disabled) {
+  background: var(--r-card-bg);
+  color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.btn-page-lux:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-indicator-lux {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--r-text-sub);
+}
+
+.page-indicator-lux .current {
+  color: var(--r-text-main);
+  background: var(--r-card-bg);
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--r-border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.page-indicator-lux .sep {
+  opacity: 0.5;
+}
+
 /* Transitions */
 .pop-lux-enter-active, .pop-lux-leave-active {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1109,5 +1331,24 @@ export default {
     flex: 1 1 auto;
     width: 100%;
   }
+}
+
+/* Deadline indicators */
+.deadline-soon {
+  color: #f59e0b !important;
+  font-weight: 700 !important;
+}
+.deadline-passed {
+  color: #ef4444 !important;
+  font-weight: 700 !important;
+  text-decoration: line-through;
+}
+.card-date-lux.deadline-soon {
+  color: #f59e0b !important;
+  font-weight: 700;
+}
+.card-date-lux.deadline-passed {
+  color: #ef4444 !important;
+  font-weight: 700;
 }
 </style>

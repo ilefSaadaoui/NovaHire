@@ -78,7 +78,7 @@
                 </div>
                 <div class="meta-item">
                   <span class="m-label">Type</span>
-                  <span class="m-value"><Briefcase :size="18" />{{ jobOffer.type }}</span>
+                  <span class="m-value"><Briefcase :size="18" />{{ translateEnum('type', jobOffer.type) }}</span>
                 </div>
                 <div class="meta-item">
                   <span class="m-label">Rémunération</span>
@@ -268,7 +268,8 @@ export default {
       if (!val) return '\u2014'
       const maps = {
         remote: { 'OnSite': 'Sur site', 'Remote': 'Télétravail total', 'Hybrid': 'Hybride' },
-        experience: { 'Junior': 'Junior (0-2 ans)', 'Intermediate': 'Intermédiaire (2-5 ans)', 'Senior': 'Senior (5-8 ans)', 'Expert': 'Expert (8+ ans)', 'Graduate': 'Jeune diplômé' }
+        experience: { 'Junior': 'Junior (0-2 ans)', 'Intermediate': 'Intermédiaire (2-5 ans)', 'Senior': 'Senior (5-8 ans)', 'Expert': 'Expert (8+ ans)', 'Graduate': 'Jeune diplômé' },
+        type: { 'FullTime': 'CDI', 'PartTime': 'Temps Partiel', 'Contract': 'CDD', 'Internship': 'Stage', 'Freelance': 'Freelance' }
       }
       return maps[type]?.[val] || val
     },

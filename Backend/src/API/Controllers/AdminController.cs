@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
 using System.Threading.Tasks;
 using System.Security.Claims;
 using Application.Interfaces;
@@ -15,6 +14,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Contrôleur d'administration globale (SuperAdmin).
+    /// Fournit les fonctionnalités de monitoring système (health), de gestion des utilisateurs,
+    /// de gestion des entreprises (création, approbation/rejet), de modération des offres,
+    /// des candidatures, des candidats, et d'audit des logs d'activité de la plateforme.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Policy = "SuperAdminOnly")]
@@ -24,6 +29,12 @@ namespace API.Controllers
         private readonly ICurrentUserService _currentUserService;
         private readonly IConfiguration _configuration;
 
+        /// <summary>
+        /// Initialise une nouvelle instance de la classe <see cref="AdminController"/>.
+        /// </summary>
+        /// <param name="context">Contexte de la base de données.</param>
+        /// <param name="currentUserService">Service de gestion de l'utilisateur connecté.</param>
+        /// <param name="configuration">Configuration de l'application.</param>
         public AdminController(ApplicationDbContext context, ICurrentUserService currentUserService, IConfiguration configuration)
         {
             _context = context;
@@ -31,6 +42,10 @@ namespace API.Controllers
             _configuration = configuration;
         }
 
+        /// <summary>
+        /// Récupère l'état de santé de tous les services connectés (API, Base de données, Stockage Cloudinary, Service IA).
+        /// </summary>
+        /// <returns>Un objet contenant l'état de fonctionnement (Stable/Down) de chaque composant.</returns>
         [HttpGet("health")]
         public async Task<IActionResult> GetSystemHealth()
         {
@@ -44,11 +59,11 @@ namespace API.Controllers
 
             try
             {
-                // Check DB
+                // Vérification de la connexion à la base de données
                 bool canConnect = await _context.Database.CanConnectAsync();
                 health = health with { database = new { status = canConnect ? "Stable" : "Down", message = canConnect ? "Optimale" : "Error" } };
 
-                // Check AI Service
+                // Vérification du service d'intelligence artificielle externe (Python)
                 var aiUrl = _configuration["AISettings:PythonServiceUrl"] ?? _configuration["AIService:Url"] ?? "http://localhost:8000";
                 using (var client = new System.Net.Http.HttpClient())
                 {
@@ -56,17 +71,17 @@ namespace API.Controllers
                     try 
                     {
                         var response = await client.GetAsync(aiUrl);
-                        bool isUp = response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound; // Even 404 means it's up
+                        bool isUp = response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound; // Un code 404 signifie que le service répond
                         health = health with { ai = new { status = isUp ? "Stable" : "Down", message = isUp ? "Actif" : "Offline" } };
                     }
-                    catch { /* Service down */ }
+                    catch { /* Le service IA est inaccessible */ }
                 }
 
-                // Check Storage (Cloudinary)
+                // Vérification du service de stockage Cloudinary
                 var cloudName = _configuration["CloudinarySettings:CloudName"];
                 if (!string.IsNullOrEmpty(cloudName))
                 {
-                    // Simple ping to Cloudinary API base
+                    // Ping vers Cloudinary
                     using (var client = new System.Net.Http.HttpClient())
                     {
                         client.Timeout = TimeSpan.FromSeconds(2);
@@ -76,19 +91,22 @@ namespace API.Controllers
                             bool isUp = response.IsSuccessStatusCode;
                             health = health with { storage = new { status = isUp ? "Stable" : "Down", message = isUp ? "98% Libre" : "Restricted" } };
                         }
-                        catch { /* Cloudinary unreachable */ }
+                        catch { /* Service Cloudinary injoignable */ }
                     }
                 }
 
                 return Ok(health);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return Ok(health); // Return partial health if crash
+                return Ok(health); // Retourne l'état partiel en cas d'exception non gérée
             }
         }
 
-        // Get all tables data
+        /// <summary>
+        /// Récupère l'intégralité des données brutes de la base de données pour l'administration (Utilisateurs, Entreprises, Offres, Candidatures).
+        /// </summary>
+        /// <returns>Un objet regroupant toutes les listes de données.</returns>
         [HttpGet("tables")]
         public async Task<IActionResult> GetAllTablesData()
         {
@@ -102,7 +120,10 @@ namespace API.Controllers
             return Ok(data);
         }
 
-        // Get table summary (counts)
+        /// <summary>
+        /// Récupère un résumé statistique du système (nombres totaux et actifs d'entités, distribution des rôles).
+        /// </summary>
+        /// <returns>Un objet JSON résumant les métriques clés de la plateforme.</returns>
         [HttpGet("summary")]
         public async Task<IActionResult> GetTablesSummary()
         {
@@ -119,12 +140,12 @@ namespace API.Controllers
                 var totalJobOffers = _context.JobOffers != null ? await _context.JobOffers.CountAsync() : 0;
                 var totalJobApplications = _context.JobApplications != null ? await _context.JobApplications.CountAsync() : 0;
 
-                // Counts for active entities
+                // Nombres totaux pour les entités actives uniquement
                 var activeUsers = await _context.Users.CountAsync(u => u.IsActive);
                 var activeCompanies = await _context.Companies.CountAsync(c => c.IsActive);
 
-                // Role distribution (Users + Candidates)
-                // Materialize first to avoid translation issues with ToString() on enum in some EF providers
+                // Distribution des rôles (Utilisateurs + Candidats)
+                // Matérialisation préalable pour éviter les erreurs de traduction SQL de Enum.ToString() sur certains providers EF Core
                 var rolesGrouped = await _context.Users
                     .GroupBy(u => u.Role)
                     .Select(g => new { Role = g.Key, Count = g.Count() })
@@ -147,7 +168,7 @@ namespace API.Controllers
                     totalCompanies,
                     totalJobOffers,
                     totalJobApplications,
-                    totalCandidatesCount = totalCandidates, // Alias for backward compatibility if needed
+                    totalCandidatesCount = totalCandidates, // Alias pour compatibilité descendante
                     activeUsers,
                     activeCompanies,
                     roleDistribution
@@ -156,15 +177,22 @@ namespace API.Controllers
             }
             catch (Exception ex)
             {
-                // Simple console log for local dev
                 Console.WriteLine($"[AdminController] Error in GetTablesSummary: {ex.Message}");
-                // Return a 500 but with a message that the store can handle
-                return StatusCode(500, new { message = "Erreur lors de la recuperation du resume admin.", detail = ex.Message });
+                return StatusCode(500, new { message = "Erreur lors de la récupération du résumé admin.", detail = ex.Message });
             }
         }
 
-        // ==================== USERS ====================
+        // ==================== UTILISATEURS ====================
 
+        /// <summary>
+        /// Récupère la liste paginée des utilisateurs du système avec filtres optionnels par rôle, entreprise et recherche textuelle.
+        /// </summary>
+        /// <param name="pageNumber">Numéro de la page à récupérer (défaut : 1).</param>
+        /// <param name="pageSize">Nombre d'utilisateurs par page (défaut : 50).</param>
+        /// <param name="role">Filtre optionnel de rôle (SuperAdmin, CompanyAdmin, Recruiter, etc.).</param>
+        /// <param name="companyId">Filtre optionnel sur l'entreprise.</param>
+        /// <param name="search">Terme de recherche appliqué sur le nom, prénom ou email.</param>
+        /// <returns>La liste paginée des utilisateurs et le nombre total d'enregistrements.</returns>
         [HttpGet("users")]
         public async Task<IActionResult> GetUsers([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50, [FromQuery] UserRole? role = null, [FromQuery] Guid? companyId = null, [FromQuery] string? search = null)
         {
@@ -184,6 +212,11 @@ namespace API.Controllers
             return Ok(new { data = users, total, pageNumber, pageSize });
         }
 
+        /// <summary>
+        /// Récupère les détails d'un utilisateur par son ID unique.
+        /// </summary>
+        /// <param name="id">Identifiant unique de l'utilisateur.</param>
+        /// <returns>L'entité de l'utilisateur demandé.</returns>
         [HttpGet("users/{id}")]
         public async Task<IActionResult> GetUserById(Guid id)
         {
@@ -192,6 +225,11 @@ namespace API.Controllers
             return Ok(user);
         }
 
+        /// <summary>
+        /// Crée un nouvel utilisateur dans le système (généralement initié par le SuperAdmin).
+        /// </summary>
+        /// <param name="dto">Les données nécessaires pour créer l'utilisateur.</param>
+        /// <returns>L'utilisateur créé avec son code de retour 201 Created.</returns>
         [HttpPost("users")]
         public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
         {
@@ -214,6 +252,12 @@ namespace API.Controllers
             return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
         }
 
+        /// <summary>
+        /// Met à jour les informations d'un utilisateur existant.
+        /// </summary>
+        /// <param name="id">L'identifiant unique de l'utilisateur à modifier.</param>
+        /// <param name="dto">Les données de mise à jour de l'utilisateur.</param>
+        /// <returns>L'utilisateur mis à jour.</returns>
         [HttpPut("users/{id}")]
         public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserDto dto)
         {
@@ -233,6 +277,11 @@ namespace API.Controllers
             return Ok(user);
         }
 
+        /// <summary>
+        /// Supprime définitivement un utilisateur du système.
+        /// </summary>
+        /// <param name="id">L'identifiant de l'utilisateur à supprimer.</param>
+        /// <returns>Code HTTP 204 NoContent en cas de succès.</returns>
         [HttpDelete("users/{id}")]
         public async Task<IActionResult> DeleteUser(Guid id)
         {
@@ -245,8 +294,14 @@ namespace API.Controllers
             return NoContent();
         }
 
-        // ==================== COMPANIES ====================
+        // ==================== ENTREPRISES ====================
 
+        /// <summary>
+        /// Récupère la liste paginée des entreprises de la plateforme.
+        /// </summary>
+        /// <param name="pageNumber">Numéro de la page (défaut : 1).</param>
+        /// <param name="pageSize">Taille de la page (défaut : 50).</param>
+        /// <returns>La liste des entreprises et le total.</returns>
         [HttpGet("companies")]
         public async Task<IActionResult> GetCompanies([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
         {
@@ -261,6 +316,10 @@ namespace API.Controllers
             return Ok(new { data = companies, total, pageNumber, pageSize });
         }
 
+        /// <summary>
+        /// Récupère les détails d'une entreprise incluant ses utilisateurs associés.
+        /// </summary>
+        /// <param name="id">Identifiant unique de l'entreprise.</param>
         [HttpGet("companies/{id}")]
         public async Task<IActionResult> GetCompanyById(Guid id)
         {
@@ -271,6 +330,10 @@ namespace API.Controllers
             return Ok(company);
         }
 
+        /// <summary>
+        /// Crée directement une nouvelle entreprise activée.
+        /// </summary>
+        /// <param name="dto">Les données nécessaires pour créer l'entreprise.</param>
         [HttpPost("companies")]
         public async Task<IActionResult> CreateCompany([FromBody] CreateCompanyDto dto)
         {
@@ -288,7 +351,6 @@ namespace API.Controllers
                 LogoUrl = dto.LogoUrl,
                 PrimaryColor = dto.PrimaryColor ?? "#FFD700",
                 SecondaryColor = dto.SecondaryColor ?? "#000000",
-
                 IsActive = dto.IsActive ?? true
             };
 
@@ -298,6 +360,11 @@ namespace API.Controllers
             return CreatedAtAction(nameof(GetCompanyById), new { id = company.Id }, company);
         }
 
+        /// <summary>
+        /// Met à jour les informations d'une entreprise existante.
+        /// </summary>
+        /// <param name="id">L'identifiant unique de l'entreprise à modifier.</param>
+        /// <param name="dto">Les nouvelles données de l'entreprise.</param>
         [HttpPut("companies/{id}")]
         public async Task<IActionResult> UpdateCompany(Guid id, [FromBody] UpdateCompanyDto dto)
         {
@@ -326,6 +393,9 @@ namespace API.Controllers
             return Ok(company);
         }
 
+        /// <summary>
+        /// Récupère toutes les entreprises en attente d'approbation (Status = Pending).
+        /// </summary>
         [HttpGet("companies/pending")]
         public async Task<IActionResult> GetPendingCompanies()
         {
@@ -336,6 +406,11 @@ namespace API.Controllers
             return Ok(companies);
         }
 
+        /// <summary>
+        /// Approuve l'inscription d'une entreprise, active ses administrateurs, et leur envoie un e-mail d'activation.
+        /// </summary>
+        /// <param name="id">L'identifiant de l'entreprise à approuver.</param>
+        /// <param name="emailService">Injection du service e-mail d'activation.</param>
         [HttpPost("companies/{id}/approve")]
         public async Task<IActionResult> ApproveCompany(Guid id, [FromServices] IEmailService emailService)
         {
@@ -350,7 +425,7 @@ namespace API.Controllers
             
             await LogActivity("APPROVE", "Company", company.Id.ToString(), $"Approbation entreprise: {company.Name}");
             
-            // Activer tous les utilisateurs de cette entreprise (normalement juste l'admin au début)
+            // Activation automatique de tous les utilisateurs créés lors de l'inscription de l'entreprise
             foreach (var user in company.Users)
             {
                 user.IsActive = true;
@@ -358,7 +433,7 @@ namespace API.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Envoyer l'email d'activation à l'admin
+            // Envoi de l'email d'activation de compte au gestionnaire principal (CompanyAdmin)
             var admin = company.Users.FirstOrDefault(u => u.Role == UserRole.CompanyAdmin);
             if (admin != null)
             {
@@ -368,6 +443,10 @@ namespace API.Controllers
             return Ok(new { message = "Entreprise approuvée et activée." });
         }
 
+        /// <summary>
+        /// Rejette l'inscription d'une entreprise et la désactive.
+        /// </summary>
+        /// <param name="id">L'identifiant de l'entreprise à rejeter.</param>
         [HttpPost("companies/{id}/reject")]
         public async Task<IActionResult> RejectCompany(Guid id)
         {
@@ -382,6 +461,9 @@ namespace API.Controllers
             return Ok(new { message = "Entreprise rejetée." });
         }
 
+        /// <summary>
+        /// Récupère la liste de tous les messages de contact général postés par le public.
+        /// </summary>
         [HttpGet("contact-messages")]
         public async Task<IActionResult> GetContactMessages()
         {
@@ -391,6 +473,11 @@ namespace API.Controllers
             return Ok(messages);
         }
 
+        /// <summary>
+        /// Met à jour le statut de traitement d'un message de contact (ex: Résolu).
+        /// </summary>
+        /// <param name="id">L'ID du message de contact.</param>
+        /// <param name="dto">Le nouveau statut à appliquer.</param>
         [HttpPut("contact-messages/{id}/status")]
         public async Task<IActionResult> UpdateContactMessageStatus(Guid id, [FromBody] UpdateContactMessageStatusDto dto)
         {
@@ -407,6 +494,10 @@ namespace API.Controllers
             return Ok(message);
         }
 
+        /// <summary>
+        /// Supprime définitivement une entreprise du système.
+        /// </summary>
+        /// <param name="id">L'identifiant de l'entreprise.</param>
         [HttpDelete("companies/{id}")]
         public async Task<IActionResult> DeleteCompany(Guid id)
         {
@@ -418,8 +509,13 @@ namespace API.Controllers
             return NoContent();
         }
 
-        // ==================== JOB OFFERS ====================
+        // ==================== OFFRES D'EMPLOI ====================
 
+        /// <summary>
+        /// Récupère la liste paginée de toutes les offres d'emploi présentes sur la plateforme (toutes entreprises confondues).
+        /// </summary>
+        /// <param name="pageNumber">Numéro de la page.</param>
+        /// <param name="pageSize">Taille de la page.</param>
         [HttpGet("joboffers")]
         public async Task<IActionResult> GetJobOffers([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
         {
@@ -435,6 +531,10 @@ namespace API.Controllers
             return Ok(new { data = offers, total, pageNumber, pageSize });
         }
 
+        /// <summary>
+        /// Récupère une offre d'emploi spécifique par son ID unique pour l'administration.
+        /// </summary>
+        /// <param name="id">ID de l'offre d'emploi.</param>
         [HttpGet("joboffers/{id}")]
         public async Task<IActionResult> GetJobOfferById(Guid id)
         {
@@ -445,6 +545,10 @@ namespace API.Controllers
             return Ok(offer);
         }
 
+        /// <summary>
+        /// Supprime définitivement une offre d'emploi de la plateforme (Modération SuperAdmin).
+        /// </summary>
+        /// <param name="id">L'identifiant unique de l'offre à supprimer.</param>
         [HttpDelete("joboffers/{id}")]
         public async Task<IActionResult> DeleteJobOffer(Guid id)
         {
@@ -456,8 +560,13 @@ namespace API.Controllers
             return NoContent();
         }
 
-        // ==================== JOB APPLICATIONS ====================
+        // ==================== CANDIDATURES ====================
 
+        /// <summary>
+        /// Récupère toutes les candidatures du système de façon paginée avec liaisons Offres et Candidats.
+        /// </summary>
+        /// <param name="pageNumber">Le numéro de page.</param>
+        /// <param name="pageSize">La taille de page.</param>
         [HttpGet("jobapplications")]
         public async Task<IActionResult> GetJobApplications([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
         {
@@ -474,6 +583,10 @@ namespace API.Controllers
             return Ok(new { data = applications, total, pageNumber, pageSize });
         }
 
+        /// <summary>
+        /// Récupère les détails de candidature par son identifiant unique.
+        /// </summary>
+        /// <param name="id">Identifiant de la candidature.</param>
         [HttpGet("jobapplications/{id}")]
         public async Task<IActionResult> GetJobApplicationById(Guid id)
         {
@@ -485,6 +598,10 @@ namespace API.Controllers
             return Ok(app);
         }
 
+        /// <summary>
+        /// Supprime définitivement une candidature du système.
+        /// </summary>
+        /// <param name="id">L'identifiant unique de la candidature.</param>
         [HttpDelete("jobapplications/{id}")]
         public async Task<IActionResult> DeleteJobApplication(Guid id)
         {
@@ -496,8 +613,12 @@ namespace API.Controllers
             return NoContent();
         }
 
-        // ==================== CANDIDATES ====================
+        // ==================== CANDIDATS ====================
 
+        /// <summary>
+        /// Récupère la fiche complète d'un candidat, avec son historique de candidatures et ses scores d'évaluation IA.
+        /// </summary>
+        /// <param name="id">L'identifiant unique du candidat.</param>
         [HttpGet("candidates/{id}")]
         public async Task<IActionResult> GetCandidateById(Guid id)
         {
@@ -541,6 +662,11 @@ namespace API.Controllers
             return Ok(dto);
         }
 
+        /// <summary>
+        /// Met à jour les informations de profil d'un candidat.
+        /// </summary>
+        /// <param name="id">L'identifiant unique du candidat.</param>
+        /// <param name="dto">Les données à modifier.</param>
         [HttpPut("candidates/{id}")]
         public async Task<IActionResult> UpdateCandidate(Guid id, [FromBody] UpdateCandidateDto dto)
         {
@@ -553,7 +679,7 @@ namespace API.Controllers
                     .AnyAsync(c => c.Email.ToLower() == dto.Email.ToLower() && c.Id != id);
 
                 if (exists)
-                    return BadRequest(new { message = "Un candidat avec cet email existe deja." });
+                    return BadRequest(new { message = "Un candidat avec cet email existe déjà." });
             }
 
             if (dto.FirstName != null) candidate.FirstName = dto.FirstName;
@@ -571,6 +697,10 @@ namespace API.Controllers
             return Ok(candidate);
         }
 
+        /// <summary>
+        /// Supprime définitivement le profil d'un candidat ainsi que tout son historique lié.
+        /// </summary>
+        /// <param name="id">L'identifiant unique du candidat.</param>
         [HttpDelete("candidates/{id}")]
         public async Task<IActionResult> DeleteCandidate(Guid id)
         {
@@ -582,10 +712,12 @@ namespace API.Controllers
             return NoContent();
         }
 
+        // ==================== LOGS D'ACTIVITE (AUDIT) ====================
 
-
-        // ==================== ACTIVITY LOGS ====================
-
+        /// <summary>
+        /// Récupère les derniers journaux d'activité (logs d'audit) enregistrés sur la plateforme.
+        /// </summary>
+        /// <param name="limit">Le nombre maximum de lignes de log à renvoyer (défaut : 100).</param>
         [HttpGet("logs")]
         public async Task<IActionResult> GetLogs([FromQuery] int limit = 100)
         {
@@ -606,14 +738,16 @@ namespace API.Controllers
             }
             catch (Exception ex)
             {
-                // Log the actual exception for debugging
                 System.Diagnostics.Debug.WriteLine($"Error fetching logs: {ex.Message}");
-                return Ok(new List<ActivityLog>()); // Return empty list on error
+                return Ok(new List<ActivityLog>()); // Retourne une liste vide en cas d'erreur de récupération
             }
         }
 
-        // ==================== PROFILE ====================
+        // ==================== PROFIL DE L'ADMINISTRATEUR ====================
 
+        /// <summary>
+        /// Récupère le profil de l'administrateur de session actuellement connecté.
+        /// </summary>
         [HttpGet("profile")]
         public async Task<IActionResult> GetAdminProfile()
         {
@@ -638,6 +772,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Met à jour les informations du profil de l'administrateur connecté.
+        /// </summary>
+        /// <param name="dto">Les nouvelles informations de profil.</param>
         [HttpPut("profile")]
         public async Task<IActionResult> UpdateAdminProfile([FromBody] UpdateAdminProfileDto dto)
         {
@@ -680,11 +818,23 @@ namespace API.Controllers
 
         #region Private Helper Methods
 
+        /// <summary>
+        /// Hache de façon sécurisée le mot de passe fourni via BCrypt.
+        /// </summary>
+        /// <param name="password">Le mot de passe en clair.</param>
+        /// <returns>La chaîne du mot de passe haché.</returns>
         private string HashPassword(string password)
         {
             return BCrypt.Net.BCrypt.HashPassword(password);
         }
 
+        /// <summary>
+        /// Journalise une action d'administration dans la table d'audit des logs d'activité.
+        /// </summary>
+        /// <param name="action">L'intitulé de l'action (CREATE, UPDATE, DELETE...).</param>
+        /// <param name="entityType">Le type d'entité sur lequel l'action porte (User, Company...).</param>
+        /// <param name="entityId">L'identifiant de l'entité ciblée.</param>
+        /// <param name="details">Informations complémentaires textuelles.</param>
         private async Task LogActivity(string action, string entityType, string entityId, string? details = null)
         {
             try
@@ -717,7 +867,9 @@ namespace API.Controllers
         #endregion
     }
 
-    // DTOs for User operations
+    /// <summary>
+    /// DTO pour la création d'un utilisateur par le SuperAdmin.
+    /// </summary>
     public class CreateUserDto
     {
         public required string FirstName { get; set; }
@@ -729,6 +881,9 @@ namespace API.Controllers
         public bool? IsActive { get; set; }
     }
 
+    /// <summary>
+    /// DTO pour la mise à jour d'un utilisateur par le SuperAdmin.
+    /// </summary>
     public class UpdateUserDto
     {
         public string? FirstName { get; set; }
@@ -739,7 +894,9 @@ namespace API.Controllers
         public bool? IsActive { get; set; }
     }
 
-    // DTOs for Company operations
+    /// <summary>
+    /// DTO pour la création directe d'une entreprise par le SuperAdmin.
+    /// </summary>
     public class CreateCompanyDto
     {
         public required string Name { get; set; }
@@ -753,10 +910,12 @@ namespace API.Controllers
         public string? LogoUrl { get; set; }
         public string? PrimaryColor { get; set; }
         public string? SecondaryColor { get; set; }
-
         public bool? IsActive { get; set; } = true;
     }
 
+    /// <summary>
+    /// DTO pour la modification d'une entreprise par le SuperAdmin.
+    /// </summary>
     public class UpdateCompanyDto
     {
         public string? Name { get; set; }
@@ -770,13 +929,13 @@ namespace API.Controllers
         public string? LogoUrl { get; set; }
         public string? PrimaryColor { get; set; }
         public string? SecondaryColor { get; set; }
-
         public bool? IsActive { get; set; }
         public CompanyStatus? Status { get; set; }
     }
 
-
-
+    /// <summary>
+    /// DTO pour la modification des informations d'un candidat.
+    /// </summary>
     public class UpdateCandidateDto
     {
         public string? FirstName { get; set; }
@@ -788,6 +947,9 @@ namespace API.Controllers
         public string? MainCVUrl { get; set; }
     }
 
+    /// <summary>
+    /// DTO pour la mise à jour de profil de l'administrateur connecté.
+    /// </summary>
     public class UpdateAdminProfileDto
     {
         public string? FirstName { get; set; }
@@ -801,6 +963,9 @@ namespace API.Controllers
         public bool? MustChangePassword { get; set; }
     }
 
+    /// <summary>
+    /// DTO pour la mise à jour du statut d'un message de contact public.
+    /// </summary>
     public class UpdateContactMessageStatusDto
     {
         public ContactMessageStatus Status { get; set; }

@@ -25,6 +25,7 @@
             <div class="view-filters">
               <button class="filter-chip" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">Tous</button>
               <button class="filter-chip" :class="{ active: activeFilter === 'visio' }" @click="activeFilter = 'visio'">Visio</button>
+              <button class="filter-chip" :class="{ active: activeFilter === 'phone' }" @click="activeFilter = 'phone'">Téléphone</button>
               <button class="filter-chip" :class="{ active: activeFilter === 'onsite' }" @click="activeFilter = 'onsite'">Physique</button>
             </div>
             
@@ -94,6 +95,9 @@
             </div>
             
             <div class="upcoming-scroll-area premium-scroll">
+              <p v-if="upcomingEvents.length === 0" class="upcoming-empty">
+                Aucun entretien à planifier.
+              </p>
               <div v-for="event in upcomingEvents" :key="event.id" class="upcoming-item-card" :class="event.Type">
                 <div class="item-date-square">
                   <span class="item-day">{{ event.dayNumber }}</span>
@@ -114,65 +118,80 @@
           </div>
         </div>
       </div>
+    </main>
 
-      <!-- MODAL DÉTAILS ENTRETIEN -->
-      <div v-if="selectedEvent" class="modal-overlay-pro" @click="selectedEvent = null">
-        <div class="modal-content-pro premium-glass anim-scale-up" @click.stop>
-          <div class="modal-header-pro">
-            <div class="header-main-pro">
-              <div class="event-type-icon" :style="{ background: selectedEvent.Color }">
-                <Video v-if="selectedEvent.Type === 'visio'" :size="20" />
-                <Clock v-else :size="20" />
+    <!-- MODAL DÉTAILS ENTRETIEN - Teleported to body to avoid stacking context issues -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="selectedEvent" class="modal-overlay-pro" @click="selectedEvent = null">
+          <div class="modal-content-pro premium-glass anim-scale-up" :class="{ 'dark-mode': isDarkMode }" @click.stop>
+            <div class="modal-header-pro">
+              <div class="header-main-pro">
+                <div class="event-type-icon" :style="{ background: selectedEvent.Color }">
+                  <Video v-if="selectedEvent.Type === 'visio'" :size="20" />
+                  <Clock v-else :size="20" />
+                </div>
+                <div>
+                  <h3>Détails de l'entretien</h3>
+                  <p>{{ selectedEvent.CandidateName }} — {{ selectedEvent.JobTitle }}</p>
+                </div>
               </div>
-              <div>
-                <h3>Détails de l'entretien</h3>
-                <p>{{ selectedEvent.CandidateName }} — {{ selectedEvent.JobTitle }}</p>
-              </div>
-            </div>
-            <button class="btn-close-pro" @click="selectedEvent = null"><X :size="20" /></button>
-          </div>
-
-          <div class="modal-body-pro">
-            <div class="info-grid-pro">
-              <div class="info-item-pro">
-                <label><CalendarIcon :size="14" /> Date & Heure</label>
-                <p>{{ formatDate(selectedEvent.date) }} à {{ selectedEvent.time }}</p>
-              </div>
-              <div class="info-item-pro">
-                <label><Info :size="14" /> Type</label>
-                <p class="type-badge-pro" :style="{ background: selectedEvent.Color + '15', color: selectedEvent.Color }">
-                  {{ (selectedEvent.Type || '').toUpperCase() }}
-                </p>
-              </div>
+              <button class="btn-close-pro" @click="selectedEvent = null"><X :size="20" /></button>
             </div>
 
-            <div class="form-group-pro">
-              <label><Plus :size="14" /> Lien ou Lieu</label>
-              <input v-model="editForm.LocationOrLink" placeholder="Lien Meet/Zoom ou adresse physique..." />
+            <div class="modal-body-pro">
+              <div class="info-grid-pro">
+                <div class="info-item-pro">
+                  <label><Info :size="14" /> Type</label>
+                  <p class="type-badge-pro" :style="{ background: selectedEvent.Color + '15', color: selectedEvent.Color }">
+                    {{ (selectedEvent.Type || '').toUpperCase() }}
+                  </p>
+                </div>
+                <div class="info-item-pro" v-if="selectedEvent.Status">
+                  <label><Clock :size="14" /> Statut</label>
+                  <p>{{ formatInterviewStatus(selectedEvent.Status) }}</p>
+                </div>
+              </div>
+
+              <div class="info-grid-pro">
+                <div class="form-group-pro">
+                  <label><CalendarIcon :size="14" /> Date</label>
+                  <input v-model="editForm.date" type="date" />
+                </div>
+                <div class="form-group-pro">
+                  <label><Clock :size="14" /> Heure</label>
+                  <input v-model="editForm.time" type="time" />
+                </div>
+              </div>
+
+              <div class="form-group-pro">
+                <label><Plus :size="14" /> Lien ou Lieu</label>
+                <input v-model="editForm.LocationOrLink" placeholder="Lien Meet/Zoom ou adresse physique..." />
+              </div>
+
+              <div class="form-group-pro">
+                <label><MessageSquare :size="14" /> Message / Informations générales</label>
+                <textarea v-model="editForm.Message" rows="5" placeholder="Ajoutez des informations générales ici..."></textarea>
+              </div>
             </div>
 
-            <div class="form-group-pro">
-              <label><MessageSquare :size="14" /> Message / Informations générales</label>
-              <textarea v-model="editForm.Message" rows="5" placeholder="Ajoutez des informations générales ici..."></textarea>
+            <div class="modal-footer-pro">
+              <button class="btn-secondary-pro" @click="selectedEvent = null">Annuler</button>
+              <button class="btn-primary-pro" @click="updateInterview" :disabled="updating">
+                <Save v-if="!updating" :size="16" />
+                <Loader2 v-else :size="16" class="spin" />
+                {{ updating ? 'Enregistrement...' : 'Enregistrer les modifications' }}
+              </button>
             </div>
-          </div>
-
-          <div class="modal-footer-pro">
-            <button class="btn-secondary-pro" @click="selectedEvent = null">Annuler</button>
-            <button class="btn-primary-pro" @click="updateInterview" :disabled="updating">
-              <Save v-if="!updating" :size="16" />
-              <Loader2 v-else :size="16" class="spin" />
-              {{ updating ? 'Enregistrement...' : 'Enregistrer les modifications' }}
-            </button>
           </div>
         </div>
-      </div>
-    </main>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import api from '@/api/axios'
 import { useAuthStore } from '@/stores/authStore'
@@ -190,11 +209,20 @@ const interviews = ref([])
 const loading = ref(true)
 const updating = ref(false)
 const activeFilter = ref('all')
+/** Masqués du planning par défaut (Kanban → Entretien réalisé → Completed). */
+const HIDDEN_FROM_PLANNING = ['Completed', 'Cancelled', 'NoShow']
 
 const selectedEvent = ref(null)
-const editForm = ref({ LocationOrLink: '', Message: '' })
+const editForm = ref({ date: '', time: '', LocationOrLink: '', Message: '' })
 
 const isDarkMode = computed(() => authStore.user?.theme === 'dark' || document.body.classList.contains('dark-mode'))
+
+const isPlanningInterview = (event) =>
+  !HIDDEN_FROM_PLANNING.includes(event.Status || '')
+
+const planningInterviews = computed(() => {
+  return interviews.value.filter(isPlanningInterview)
+})
 
 const filteredEvents = (dayEvents) => {
   if (activeFilter.value === 'all') return dayEvents
@@ -207,6 +235,30 @@ const goToToday = () => {
 
 const formatDate = (date) => {
   return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+const toDateInputValue = (date) => {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const toTimeInputValue = (date) => {
+  const h = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${h}:${min}`
+}
+
+const formatInterviewStatus = (status) => {
+  const labels = {
+    Planned: 'Planifié',
+    Completed: 'Réalisé',
+    Cancelled: 'Annulé',
+    Rescheduled: 'Reporté',
+    NoShow: 'Absent'
+  }
+  return labels[status] || status
 }
 
 const fetchInterviews = async () => {
@@ -228,6 +280,7 @@ const fetchInterviews = async () => {
         candidate: i.candidateName || i.CandidateName,
         CandidateName: i.candidateName || i.CandidateName,
         JobTitle: i.jobTitle || i.JobTitle,
+        Status: i.status || i.Status || '',
         time: date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       }
     })
@@ -239,6 +292,10 @@ const fetchInterviews = async () => {
 }
 
 onMounted(() => {
+  fetchInterviews()
+})
+
+onActivated(() => {
   fetchInterviews()
 })
 
@@ -275,9 +332,9 @@ const calendarDays = computed(() => {
   const today = new Date()
   for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
     const date = new Date(year, month, i)
-    const dayEvents = interviews.value.filter(e => 
-      e.date.getDate() === date.getDate() && 
-      e.date.getMonth() === date.getMonth() && 
+    const dayEvents = planningInterviews.value.filter(e =>
+      e.date.getDate() === date.getDate() &&
+      e.date.getMonth() === date.getMonth() &&
       e.date.getFullYear() === date.getFullYear()
     )
     
@@ -303,8 +360,12 @@ const calendarDays = computed(() => {
 })
 
 const upcomingEvents = computed(() => {
-  return interviews.value
-    .filter(e => e.date >= new Date())
+  const now = new Date()
+  let list = planningInterviews.value.filter(e => e.date >= now)
+  if (activeFilter.value !== 'all') {
+    list = list.filter(e => e.Type === activeFilter.value)
+  }
+  return list
     .sort((a, b) => a.date - b.date)
     .map(e => ({
       ...e,
@@ -325,6 +386,8 @@ const nextMonth = () => {
 const showEventDetails = (event) => {
   selectedEvent.value = event
   editForm.value = {
+    date: toDateInputValue(event.date),
+    time: toTimeInputValue(event.date),
     LocationOrLink: event.LocationOrLink || event.locationOrLink || '',
     Message: event.Message || event.message || ''
   }
@@ -332,25 +395,40 @@ const showEventDetails = (event) => {
 
 const updateInterview = async () => {
   if (!selectedEvent.value) return
+  if (!editForm.value.date || !editForm.value.time) {
+    toastStore.warning('Veuillez renseigner la date et l\'heure')
+    return
+  }
   updating.value = true
   try {
-    await api.patch(`/recruiter/interviews/${selectedEvent.value.Id || selectedEvent.value.id}`, {
+    const eventId = selectedEvent.value.Id || selectedEvent.value.id
+    const { data } = await api.patch(`/recruiter/interviews/${eventId}`, {
+      date: editForm.value.date,
+      time: editForm.value.time,
       LocationOrLink: editForm.value.LocationOrLink,
       Message: editForm.value.Message
     })
-    
-    // Update local state
-    const idx = interviews.value.findIndex(i => (i.Id || i.id) === (selectedEvent.value.Id || selectedEvent.value.id))
+
+    const newDate = data?.scheduledAt
+      ? new Date(data.scheduledAt)
+      : new Date(`${editForm.value.date}T${editForm.value.time}`)
+
+    const idx = interviews.value.findIndex(i => (i.Id || i.id) === eventId)
     if (idx !== -1) {
+      interviews.value[idx].date = newDate
+      interviews.value[idx].time = newDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       interviews.value[idx].LocationOrLink = editForm.value.LocationOrLink
       interviews.value[idx].Message = editForm.value.Message
+      if (interviews.value[idx].Status === 'Planned')
+        interviews.value[idx].Status = 'Rescheduled'
     }
-    
-    toastStore.success('Entretien mis à jour avec succès')
+
+    toastStore.success('Entretien reprogrammé avec succès')
     selectedEvent.value = null
   } catch (error) {
     console.error('Error updating interview:', error)
-    toastStore.error('Erreur lors de la mise à jour')
+    const msg = error.response?.data?.message || 'Erreur lors de la mise à jour'
+    toastStore.error(msg)
   } finally {
     updating.value = false
   }
@@ -366,7 +444,9 @@ const updateInterview = async () => {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 30px;
   position: relative;
-  overflow-x: hidden;
+  /* IMPORTANT: Do NOT set overflow: hidden here — it creates a stacking context
+     that traps position:fixed children (like the modal overlay) and blocks clicks */
+  overflow: visible;
   margin-left: 320px; 
 }
 
@@ -383,6 +463,21 @@ const updateInterview = async () => {
   z-index: 1;
   max-width: 1600px;
   margin: 0 auto;
+  pointer-events: auto;
+}
+
+/* Guarantee all interactive elements are always clickable in dark mode */
+.dark-mode button,
+.dark-mode .filter-chip,
+.dark-mode .btn-nav-arrow,
+.dark-mode .btn-today-nav,
+.dark-mode .event-card-mini,
+.dark-mode .btn-close-pro,
+.dark-mode .btn-primary-pro,
+.dark-mode .btn-secondary-pro {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 2;
 }
 
 /* HEADER PRO */
@@ -424,6 +519,17 @@ const updateInterview = async () => {
 
 .filter-chip.active { background: white; color: var(--primary); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
 .dark-mode .filter-chip.active { background: var(--primary); color: white; }
+.filter-chip-muted.active { background: #f1f5f9; color: #64748b; box-shadow: none; }
+.dark-mode .filter-chip-muted.active { background: rgba(148, 163, 184, 0.2); color: #e2e8f0; }
+
+.upcoming-empty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #94a3b8;
+}
 
 .navigation-controls { display: flex; align-items: center; gap: 16px; }
 
@@ -601,9 +707,16 @@ const updateInterview = async () => {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* CELESTIAL BG */
-.celestial-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; opacity: 0.3; }
+.celestial-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  opacity: 0.3;
+  pointer-events: none;
+}
 .dark-mode .celestial-bg { opacity: 0.6; }
-.c-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.15; animation: float 20s infinite alternate; }
+.c-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.15; animation: float 20s infinite alternate; pointer-events: none; }
 .orb-1 { width: 600px; height: 600px; background: var(--primary); top: -200px; right: -100px; }
 .orb-2 { width: 500px; height: 500px; background: #8b5cf6; bottom: -100px; left: -100px; }
 
@@ -622,25 +735,35 @@ const updateInterview = async () => {
 
 /* MODAL PRO STYLES */
 .modal-overlay-pro {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(8px);
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+  position: fixed !important;
+  inset: 0 !important;
+  min-height: 100vh !important;
+  background: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(8px) !important;
+  z-index: 10000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  overflow-y: auto !important;
+  pointer-events: auto !important;
+}
+
+.modal-overlay-pro * {
+  pointer-events: auto !important;
 }
 
 .modal-content-pro {
   background: rgba(255, 255, 255, 0.9);
   width: 100%;
   max-width: 600px;
+  margin: auto;
+  max-height: calc(100vh - 40px);
   border-radius: 32px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 40px 100px rgba(0, 0, 0, 0.15);
   overflow: hidden;
+  pointer-events: auto !important;
 }
 
 .dark-mode .modal-content-pro {
@@ -729,4 +852,8 @@ const updateInterview = async () => {
 @keyframes scaleUp { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 .spin { animation: spin 1s linear infinite; }
+
+/* Modal teleported to body — needs non-scoped global styles */
+.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.25s ease; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 </style>

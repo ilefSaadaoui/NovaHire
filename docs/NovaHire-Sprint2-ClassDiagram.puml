@@ -1,0 +1,99 @@
+@startuml NovaHire-Sprint2-ClassDiagram
+title Sprint 2 - Offres, portail candidat et analyse IA\nDiagramme de classes (vue metier) - UML 2.5.1
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+enum StatutOffre {
+  Brouillon
+  Publiee
+  Fermee
+  Archivee
+}
+
+enum StatutCandidature {
+  Recue
+  En_analyse
+}
+
+class OffreEmploi {
+  -titre : String
+  -description : String
+  -lieu : String
+  -dateLimite : Date
+  -statut : StatutOffre
+  -jetonPartage : String
+  __
+  +publier() : void
+  +fermer() : void
+  +estActive() : Boolean
+  +genererDescriptionIA() : void
+}
+
+class Candidat {
+  -nom : String
+  -prenom : String
+  -email : String
+  -telephone : String
+  __
+  +postuler(offre) : Candidature
+}
+
+class Candidature {
+  -dateDepot : Date
+  -statut : StatutCandidature
+  -urlCV : String
+  -scoreIA : Integer
+  __
+  +deposer() : void
+  +lancerAnalyseIA() : void
+}
+
+class AnalyseIAProfil {
+  -scoreGlobal : Integer
+  -scoreExperience : Integer
+  -scoreFormation : Integer
+  -scoreCompetences : Integer
+  -resume : String
+  -recommandation : String
+  -pointsForts : String[]
+  -pointsVigilance : String[]
+  -questionsEntretien : String[]
+  __
+  +extraireDonneesCV() : void
+  +calculerScores() : void
+}
+
+class Societe {
+  -nom : String
+}
+
+class Collaborateur {
+  -nom : String
+  -email : String
+  __
+  +creerOffre() : OffreEmploi
+}
+
+Societe "1" *-- "0..*" OffreEmploi : publie
+Collaborateur "1" o-- "0..*" OffreEmploi : cree
+OffreEmploi "1" o-- "0..*" Candidature : recoit
+Candidat "1" o-- "0..*" Candidature : depose
+Candidature "1" *-- "0..1" AnalyseIAProfil : diagnostic
+
+OffreEmploi ..> StatutOffre
+Candidature ..> StatutCandidature
+
+note bottom of Candidature
+  Analyse **manuelle** par le recruteur
+  (RecruiterController)
+end note
+
+note bottom of OffreEmploi
+  Publish() et Close() existent
+  sur l entite JobOffer (C#)
+end note
+
+@enduml

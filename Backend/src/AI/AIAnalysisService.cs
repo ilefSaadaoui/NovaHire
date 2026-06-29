@@ -15,12 +15,9 @@ using Polly.CircuitBreaker;
 namespace AI
 {
     /// <summary>
-    /// AI Analysis Service client.
-    /// Supports two modes:
-    ///   1. Synchronous: POST /analyze (backward compatible, blocks until done)
-    ///   2. Async Job:   POST /jobs → poll GET /jobs/{id} (non-blocking, high throughput)
-    ///
-    /// The async mode is used by default. Falls back to sync if async submission fails.
+    /// Service d'analyse par Intelligence Artificielle pour NovaHire.
+    /// Gère l'extraction de CV, la notation automatique, la génération de quiz et d'offres d'emploi.
+    /// Communique avec le microservice IA sous-jacent (FastAPI/Ollama).
     /// </summary>
     public class AIAnalysisService : IAIService
     {
@@ -38,6 +35,14 @@ namespace AI
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
+        /// <summary>
+        /// Initialise une nouvelle instance de <see cref="AIAnalysisService"/>.
+        /// Configure le client HTTP avec un long timeout pour supporter les modèles LLM s'exécutant sur CPU.
+        /// </summary>
+        /// <param name="httpClient">Le client HTTP injecté.</param>
+        /// <param name="configuration">La configuration de l'application pour les URLs et les paramètres de polling.</param>
+        /// <param name="logger">Le logger pour le suivi d'audit.</param>
+        /// <param name="storageService">Le service de stockage pour récupérer les CVs.</param>
         public AIAnalysisService(
             HttpClient httpClient,
             IConfiguration configuration,
@@ -54,6 +59,17 @@ namespace AI
             _maxPollAttempts = configuration.GetValue("AIService:MaxPollAttempts", 150);
         }
 
+        /// <summary>
+        /// Analyse un CV (local ou stocké à distance sur Cloudinary) par rapport à une offre d'emploi.
+        /// </summary>
+        /// <param name="filePath">Chemin d'accès local ou URL Cloudinary du fichier du CV (PDF ou DOCX).</param>
+        /// <param name="jobTitle">Intitulé du poste ciblé.</param>
+        /// <param name="jobDescription">Description détaillée de l'offre d'emploi.</param>
+        /// <param name="weightExp">Poids accordé à l'expérience (en %).</param>
+        /// <param name="weightEdu">Poids accordé à l'éducation/diplômes (en %).</param>
+        /// <param name="weightSkills">Poids accordé aux compétences clés (en %).</param>
+        /// <param name="language">Langue de l'analyse (par défaut "fr").</param>
+        /// <returns>Un objet <see cref="AIAnalysisResponseDto"/> contenant le score global, la recommandation IA et les données extraites structurées.</returns>
         public async Task<AIAnalysisResponseDto> AnalyzeCVAsync(
             string filePath,
             string jobTitle,
@@ -71,6 +87,7 @@ namespace AI
             byte[] fileBytes;
             string fileName;
 
+            // Détection si le fichier est stocké sur Cloudinary (URL externe) ou en local
             if (filePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
                 var signedUrl = _storageService.GetDownloadUrl(filePath);
@@ -84,12 +101,13 @@ namespace AI
                 fileBytes = Array.Empty<byte>();
                 fileName = "resume.pdf";
 
+                // Tentative de téléchargement depuis les URLs de téléchargement disponibles
                 foreach (var downloadUrl in downloadUrls)
                 {
                     Console.WriteLine($"[AIAnalysisService] Downloading CV from: {downloadUrl}");
                     try
                     {
-                        // Use a fresh HttpClient to avoid any base-address / auth-header conflicts
+                        // Utilisation d'un HttpClient éphémère pour éviter des conflits d'en-têtes HTTP globaux
                         using var downloadClient = new HttpClient();
                         downloadClient.Timeout = TimeSpan.FromSeconds(60);
 
@@ -104,7 +122,7 @@ namespace AI
 
                         fileBytes = await downloadResponse.Content.ReadAsByteArrayAsync();
 
-                        // Extract filename from URL; fall back to "resume.pdf"
+                        // Extraction sécurisée du nom de fichier original à partir de l'URL
                         try
                         {
                             var rawPath = new Uri(downloadUrl).AbsolutePath;
@@ -115,7 +133,7 @@ namespace AI
                             fileName = "resume.pdf";
                         }
 
-                        // Ensure a valid extension (.pdf or .docx)
+                        // S'assurer de forcer une extension de fichier valide supportée par le parseur IA
                         var ext = Path.GetExtension(fileName).ToLowerInvariant();
                         if (string.IsNullOrEmpty(ext) || !new[] { ".pdf", ".docx", ".doc" }.Contains(ext))
                             fileName = Path.GetFileNameWithoutExtension(fileName) + ".pdf";
@@ -139,6 +157,7 @@ namespace AI
             }
             else
             {
+                // Chargement local si le chemin n'est pas une URL
                 if (!File.Exists(filePath))
                 {
                     Console.WriteLine($"[AIAnalysisService] ERROR: Local file not found: {filePath}");
@@ -154,12 +173,14 @@ namespace AI
 
             try
             {
+                // Exécution de l'analyse en deux étapes (Extraction puis Scoring) pour une meilleure robustesse
                 return await AnalyzeInTwoStagesAsync(
                     fileBytes, fileName, jobTitle, jobDescription,
                     weightExp, weightEdu, weightSkills, language);
             }
             catch (BrokenCircuitException)
             {
+                // Gestion gracieuse en cas de surcharge du service IA (Disjoncteur ouvert/Circuit Breaker)
                 _logger.LogWarning("AI Service circuit is broken. Returning degraded response.");
                 return new AIAnalysisResponseDto
                 {
@@ -171,11 +192,16 @@ namespace AI
             }
         }
 
+        /// <summary>
+        /// Effectue l'analyse en deux étapes pour contourner les limites de fenêtres de contexte des LLM :
+        /// Étape 1 : Envoi du document brut pour en extraire uniquement le texte et les entités (CV brut).
+        /// Étape 2 : Envoi du texte extrait pour calculer le score final, les recommandations et le résumé.
+        /// </summary>
         private async Task<AIAnalysisResponseDto> AnalyzeInTwoStagesAsync(
             byte[] fileBytes, string fileName, string jobTitle, string jobDescription,
             int weightExp, int weightEdu, int weightSkills, string language)
         {
-            // Stage 1: extract text/data from PDF only
+            // Étape 1 : Extraction textuelle du PDF/DOCX
             using var extractForm = BuildFormContent(
                 fileBytes, fileName, jobTitle, jobDescription,
                 weightExp, weightEdu, weightSkills, "extract_only", language);
@@ -194,7 +220,7 @@ namespace AI
             if (string.IsNullOrWhiteSpace(extractResult.RawCvText))
                 throw new Exception("Le texte CV extrait est vide.");
 
-            // Stage 2: score + summary from extracted text
+            // Étape 2 : Scoring, synthèse et recommandations à partir du texte extrait
             var scorePayload = new
             {
                 cvText = extractResult.RawCvText,
@@ -222,7 +248,7 @@ namespace AI
             var scoreResult = JsonSerializer.Deserialize<AIAnalysisResponseDto>(scoreJson, JsonOptions)
                 ?? throw new Exception("Réponse de scoring IA invalide.");
 
-            // Keep extraction details if score response omitted any extracted fields.
+            // Préservation des détails de l'extraction de l'Étape 1 si l'Étape 2 les a omis ou vidés
             if (scoreResult.ExtractedData == null ||
                 (scoreResult.ExtractedData.WorkExperiences.Count == 0 &&
                  scoreResult.ExtractedData.Educations.Count == 0 &&
@@ -236,14 +262,24 @@ namespace AI
             return scoreResult;
         }
 
+        /// <summary>
+        /// Génère un quiz technique personnalisé par l'IA basé sur la fiche de poste et les critères demandés.
+        /// </summary>
+        /// <param name="jobTitle">L'intitulé du poste cible.</param>
+        /// <param name="jobDescription">La description de poste ou les critères requis.</param>
+        /// <param name="numQuestions">Le nombre de questions à générer (par défaut 10).</param>
+        /// <param name="language">Langue du quiz (par défaut "fr").</param>
+        /// <param name="difficulty">Niveau de difficulté ciblé ("Junior", "Mid", "Senior").</param>
+        /// <param name="topics">Thématiques ou compétences particulières à évaluer.</param>
+        /// <returns>Un objet <see cref="AIQuizResponseDto"/> contenant le quiz complet et les bonnes réponses.</returns>
         public async Task<AIQuizResponseDto> GenerateQuizAsync(string jobTitle, string jobDescription, int numQuestions = 10, string language = "fr", string difficulty = "Mid", List<string>? topics = null)
         {
             try
             {
                 var payload = new
                 {
-                    jobTitle = string.IsNullOrWhiteSpace(jobTitle) ? "Poste g\u00e9n\u00e9ral" : jobTitle,
-                    jobDescription = string.IsNullOrWhiteSpace(jobDescription) ? "Comp\u00e9tences professionnelles g\u00e9n\u00e9rales" : jobDescription,
+                    jobTitle = string.IsNullOrWhiteSpace(jobTitle) ? "Poste général" : jobTitle,
+                    jobDescription = string.IsNullOrWhiteSpace(jobDescription) ? "Compétences professionnelles générales" : jobDescription,
                     numQuestions = numQuestions,
                     language = language,
                     difficulty = difficulty,
@@ -274,11 +310,12 @@ namespace AI
             }
             catch (BrokenCircuitException)
             {
+                // Repli sur un quiz vide ou dégradé si le disjoncteur est ouvert
                 _logger.LogWarning("AI Service circuit is broken during quiz generation.");
                 return new AIQuizResponseDto
                 {
                     Title = "Quiz Indisponible",
-                    Description = "Le service de g\u00e9n\u00e9ration de quiz est temporairement hors ligne.",
+                    Description = "Le service de génération de quiz est temporairement hors ligne.",
                     Questions = new List<AIQuizQuestionDto>()
                 };
             }
@@ -289,6 +326,13 @@ namespace AI
             }
         }
 
+        /// <summary>
+        /// Génère une fiche de poste rédigée de manière professionnelle par l'IA à partir d'un titre et de mots-clés.
+        /// </summary>
+        /// <param name="jobTitle">Intitulé du poste.</param>
+        /// <param name="keywords">Mots-clés optionnels à inclure (ex: technologies, avantages).</param>
+        /// <param name="language">Langue de rédaction ("fr" par défaut).</param>
+        /// <returns>La fiche de poste au format Markdown ou texte enrichi générée par l'IA.</returns>
         public async Task<string> GenerateJobDescriptionAsync(string jobTitle, string? keywords = null, string language = "fr")
         {
             try
@@ -327,6 +371,14 @@ namespace AI
             }
         }
 
+        /// <summary>
+        /// Génère un e-mail de refus constructif et bienveillant, personnalisé selon le retour et les notes du recruteur.
+        /// </summary>
+        /// <param name="candidateName">Nom du candidat.</param>
+        /// <param name="jobTitle">Intitulé du poste.</param>
+        /// <param name="recruiterNotes">Notes internes ou axes d'amélioration identifiés par le recruteur.</param>
+        /// <param name="language">Langue de rédaction de l'e-mail.</param>
+        /// <returns>Le contenu de l'e-mail de retour d'expérience personnalisé.</returns>
         public async Task<string> GenerateRejectionFeedbackAsync(string candidateName, string jobTitle, string recruiterNotes, string language = "fr")
         {
             try
@@ -366,6 +418,19 @@ namespace AI
             }
         }
 
+        /// <summary>
+        /// Rédige automatiquement une lettre d'offre de proposition d'embauche personnalisée avec les détails financiers et contractuels.
+        /// </summary>
+        /// <param name="candidateName">Nom du candidat.</param>
+        /// <param name="jobTitle">Intitulé du poste proposé.</param>
+        /// <param name="salary">Salaire annuel ou mensuel brut convenu.</param>
+        /// <param name="currency">Devise monétaire (EUR, CAD, USD, etc.).</param>
+        /// <param name="startDate">Date de début d'activité contractuelle.</param>
+        /// <param name="benefits">Avantages listés (Mutuelle, Télétravail, BSPCE, RTT, etc.).</param>
+        /// <param name="recruiterName">Nom du recruteur émetteur.</param>
+        /// <param name="companyName">Nom de l'entreprise d'accueil.</param>
+        /// <param name="language">Langue de rédaction ("fr").</param>
+        /// <returns>La lettre de proposition rédigée de manière formelle et prête à être envoyée.</returns>
         public async Task<string> GenerateOfferLetterAsync(string candidateName, string jobTitle, decimal salary, string currency, string startDate, string benefits, string recruiterName, string companyName, string language = "fr")
         {
             try
@@ -407,56 +472,8 @@ namespace AI
             }
         }
 
-        public async Task<ExtractedDataDto> ExtractCVAsync(string filePath)
-        {
-            byte[] fileBytes;
-            string fileName;
-
-            if (filePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-            {
-                var signedUrl = _storageService.GetDownloadUrl(filePath);
-                using var downloadClient = new HttpClient();
-                downloadClient.Timeout = TimeSpan.FromSeconds(60);
-                var dlResponse = await downloadClient.GetAsync(signedUrl ?? filePath);
-                if (!dlResponse.IsSuccessStatusCode)
-                    throw new Exception("Impossible de télécharger le CV.");
-                fileBytes = await dlResponse.Content.ReadAsByteArrayAsync();
-                try { fileName = Path.GetFileName(new Uri(filePath).AbsolutePath); } catch { fileName = "resume.pdf"; }
-            }
-            else
-            {
-                if (!File.Exists(filePath))
-                    throw new FileNotFoundException("CV file not found", filePath);
-                fileBytes = await File.ReadAllBytesAsync(filePath);
-                fileName = Path.GetFileName(filePath);
-            }
-
-            var ext = Path.GetExtension(fileName).ToLowerInvariant();
-            if (string.IsNullOrEmpty(ext) || !new[] { ".pdf", ".docx", ".doc" }.Contains(ext))
-                fileName = Path.GetFileNameWithoutExtension(fileName) + ".pdf";
-
-            // Use extract_only mode — no scoring, just parsing
-            using var extractForm = BuildFormContent(
-                fileBytes, fileName, "N/A", "N/A",
-                33, 33, 34, "extract_only", "fr");
-
-            var extractResponse = await _httpClient.PostAsync($"{_aiServiceUrl}/analyze", extractForm);
-            if (!extractResponse.IsSuccessStatusCode)
-            {
-                var error = await extractResponse.Content.ReadAsStringAsync();
-                throw new Exception($"Extraction IA échouée: {extractResponse.StatusCode} - {error}");
-            }
-
-            var extractJson = await extractResponse.Content.ReadAsStringAsync();
-            var extractResult = JsonSerializer.Deserialize<AIAnalysisResponseDto>(extractJson, JsonOptions)
-                ?? throw new Exception("Réponse d'extraction IA invalide.");
-
-            return extractResult.ExtractedData ?? new ExtractedDataDto();
-        }
-
         /// <summary>
-        /// Synchronous mode: POST /analyze and wait for response.
-        /// Backward compatible with v1.
+        /// Mode Synchrone : Envoie le CV et attend directement la réponse d'analyse de l'IA (méthode bloquante et historique).
         /// </summary>
         private async Task<AIAnalysisResponseDto> AnalyzeSynchronousAsync(
             byte[] fileBytes, string fileName, string jobTitle, string jobDescription,
@@ -493,14 +510,14 @@ namespace AI
         }
 
         /// <summary>
-        /// Async mode: POST /jobs → poll GET /jobs/{id} until completed.
-        /// Non-blocking for the AI service — supports high concurrency.
+        /// Mode Asynchrone : Soumet la demande d'analyse au microservice d'IA, récupère un identifiant de Job,
+        /// puis effectue un polling à intervalle régulier jusqu'à complétion ou échec du traitement.
         /// </summary>
         private async Task<AIAnalysisResponseDto> AnalyzeViaJobQueueAsync(
             byte[] fileBytes, string fileName, string jobTitle, string jobDescription,
             int weightExp, int weightEdu, int weightSkills, string language)
         {
-            // Step 1: Submit job
+            // Étape 1 : Soumission de la tâche d'analyse
             string jobId;
             using (var form = BuildFormContent(fileBytes, fileName, jobTitle, jobDescription,
                 weightExp, weightEdu, weightSkills, "full_analysis", language))
@@ -526,7 +543,7 @@ namespace AI
                 _logger.LogInformation("Job submitted: {JobId}", jobId);
             }
 
-            // Step 2: Poll until completed or failed
+            // Étape 2 : Boucle de Polling active avec limites pour éviter les blocages infinis
             for (int attempt = 0; attempt < _maxPollAttempts; attempt++)
             {
                 await Task.Delay(_pollIntervalMs);
@@ -575,6 +592,9 @@ namespace AI
                 $"{_maxPollAttempts * _pollIntervalMs / 1000}s");
         }
 
+        /// <summary>
+        /// Construit le corps de la requête Multipart contenant le fichier binaire du CV et les métadonnées requises par le moteur d'IA.
+        /// </summary>
         private MultipartFormDataContent BuildFormContent(
             byte[] fileBytes, string fileName, string jobTitle, string jobDescription,
             int weightExp, int weightEdu, int weightSkills, string mode = "full_analysis", string language = "fr")
@@ -582,7 +602,7 @@ namespace AI
             var form = new MultipartFormDataContent();
 
             var fileContent = new ByteArrayContent(fileBytes);
-            // Set content-type based on file extension
+            // Déduction du Content-Type HTTP à partir de l'extension de fichier
             var ext = Path.GetExtension(fileName).ToLowerInvariant();
             fileContent.Headers.ContentType = ext switch
             {
@@ -602,8 +622,11 @@ namespace AI
             return form;
         }
 
-        // ── Internal DTOs for job queue communication ──
+        // ── DTOs Internes de Communication pour la gestion de file d'attente ──
 
+        /// <summary>
+        /// DTO représentant le retour de soumission d'une tâche d'analyse IA.
+        /// </summary>
         private class JobSubmitResponse
         {
             [JsonPropertyName("job_id")]
@@ -613,6 +636,9 @@ namespace AI
             public string? Status { get; set; }
         }
 
+        /// <summary>
+        /// DTO représentant l'état retourné par l'interrogation (polling) d'une tâche asynchrone IA.
+        /// </summary>
         private class JobPollResponse
         {
             [JsonPropertyName("job_id")]
@@ -631,6 +657,9 @@ namespace AI
             public Dictionary<string, double>? StageTimings { get; set; }
         }
 
+        /// <summary>
+        /// DTO pour la requête directe de calcul de score à partir de texte brut extrait.
+        /// </summary>
         private class ScoreFromTextRequest
         {
             [JsonPropertyName("cvText")]

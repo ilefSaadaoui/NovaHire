@@ -18,7 +18,8 @@
         "noResults": "No results",
         "new": "New",
         "exporting": "Exporting...",
-        "locale_tag": "en-GB"
+        "locale_tag": "en-GB",
+        "calendar": "Calendar"
     },
     "profile": {
         "verified": "Account Verified",
@@ -241,7 +242,8 @@
         "types": {
             "fullTime": "Full-Time (CDI)",
             "contract": "Contract (CDD)",
-            "internship": "Internship / Apprenticeship",
+            "internship": "Internship",
+            "partTime": "Part-Time",
             "freelance": "Freelance / Independent"
         },
         "experience": {
@@ -453,6 +455,13 @@
                 "office": "On-site",
                 "hybrid": "Hybrid",
                 "remote": "Full Remote"
+            },
+            "types": {
+                "cdi": "CDI (Full-Time)",
+                "cdd": "CDD (Fixed-term)",
+                "freelance": "Freelance / Independent",
+                "stage": "Internship",
+                "partTime": "Part-Time"
             }
         },
         "profile": {
@@ -516,5 +525,11 @@
         "commentAdded": "Comment added",
         "noCV": "No CV available.",
         "testCV": "Test candidate. No real CV."
+    },
+    "calendar": {
+        "subtitle": "Schedule and manage your interviews and team meetings",
+        "schedule": "Schedule",
+        "upcoming": "Upcoming interviews",
+        "noEvents": "No events scheduled"
     }
 }

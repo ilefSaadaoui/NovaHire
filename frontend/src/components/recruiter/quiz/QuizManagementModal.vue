@@ -201,6 +201,7 @@
 
 <script>
 import axios from '@/api/axios';
+import { useModalStore } from '@/stores/modalStore';
 
 export default {
   name: 'QuizManagementModal',
@@ -286,18 +287,30 @@ export default {
           language: this.config.language,
           difficulty: this.config.difficulty,
           topics: topics
+        }, {
+          timeout: 120000 // 2 minutes — l'IA peut prendre du temps pour générer le quiz
         });
         this.quiz = response.data;
       } catch (err) {
         console.error("Erreur génération quiz:", err.response?.data || err);
-        const errorMsg = err.response?.data?.message || err.message;
+        const errorMsg = err.code === 'ECONNABORTED'
+          ? "La génération a pris trop de temps. Réessayez ou réduisez le nombre de questions."
+          : (err.response?.data?.message || err.message);
         this.showError('Erreur de génération: ' + errorMsg);
       } finally {
         this.loading = false;
       }
     },
     async regenerateQuiz() {
-      if (confirm('Régénérer un nouveau quiz ? Le quiz actuel sera remplacé.')) {
+      const modalStore = useModalStore();
+      const confirmed = await modalStore.confirm({
+        title: 'Régénérer le Quiz ?',
+        message: 'Le quiz actuel sera définitivement remplacé par une nouvelle génération IA.',
+        confirmText: 'Régénérer',
+        cancelText: 'Annuler',
+        type: 'warning'
+      });
+      if (confirmed) {
         this.quiz = null;
       }
     },
@@ -318,11 +331,19 @@ export default {
       setTimeout(() => this.copied = false, 2000);
       if (window.showToast) window.showToast("Lien copié ! Vous pouvez l'envoyer au candidat.", 'success');
     },
-    handleInvitationClick() {
+    async handleInvitationClick() {
       if (this.applicationId) {
         this.sendInvitation();
       } else {
-        if (confirm(`Voulez-vous envoyer ce test de présélection à TOUS les candidats de l'offre ?`)) {
+        const modalStore = useModalStore();
+        const confirmed = await modalStore.confirm({
+          title: 'Envoyer à tous les candidats ?',
+          message: `Ce test de présélection sera envoyé à TOUS les candidats de l'offre "${this.jobOffer?.title}". Voulez-vous continuer ?`,
+          confirmText: 'Envoyer à tous',
+          cancelText: 'Annuler',
+          type: 'warning'
+        });
+        if (confirmed) {
           this.sendInvitationToAll();
         }
       }
@@ -353,10 +374,18 @@ export default {
         this.invitingCandidate = false;
       }
     },
-    deleteQuiz() {
-       if(confirm("Voulez-vous vraiment supprimer ce quiz ?")) {
-           this.quiz = null;
-       }
+    async deleteQuiz() {
+      const modalStore = useModalStore();
+      const confirmed = await modalStore.confirm({
+        title: 'Supprimer le Quiz ?',
+        message: 'Cette action est irréversible. Le quiz sera définitivement supprimé pour cette offre.',
+        confirmText: 'Supprimer',
+        cancelText: 'Annuler',
+        type: 'danger'
+      });
+      if (confirmed) {
+        this.quiz = null;
+      }
     },
     async saveQuiz() {
       try {
@@ -366,7 +395,7 @@ export default {
         this.isEditing = false;
       } catch (err) {
         console.error("Erreur sauvegarde quiz:", err);
-        alert("Erreur lors de la sauvegarde.");
+        this.showError("Erreur lors de la sauvegarde du quiz.");
       } finally {
         this.saving = false;
       }
@@ -396,7 +425,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2147483647;
+  z-index: 9990;
   padding: 20px;
 }
 </style>

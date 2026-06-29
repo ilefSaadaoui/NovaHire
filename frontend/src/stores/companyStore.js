@@ -17,8 +17,6 @@ export const useCompanyStore = defineStore('company', {
     branding: {
       companyName: '',
       logoUrl: '',
-      primaryColor: '#0ea5e9', // Celestial Sky Blue
-      secondaryColor: '#fcd34d', // Premium Gold
       description: '',
       industry: '',
       website: ''
@@ -45,7 +43,6 @@ export const useCompanyStore = defineStore('company', {
       try {
         const res = await api.get('/companyadmin/branding')
         this.branding = res.data
-        this.applyBrandingToCSS()
       } catch (error) {
         console.error('Error fetching branding:', error)
       }
@@ -55,7 +52,6 @@ export const useCompanyStore = defineStore('company', {
       try {
         await api.put('/companyadmin/branding', payload)
         this.branding = { ...this.branding, ...payload }
-        this.applyBrandingToCSS()
       } catch (error) {
         useToastStore().show('Erreur lors de la mise à jour', 'error')
       }
@@ -245,15 +241,6 @@ export const useCompanyStore = defineStore('company', {
       }
     },
 
-    applyBrandingToCSS() {
-      if (this.branding.primaryColor) {
-        document.documentElement.style.setProperty('--brand-primary', this.branding.primaryColor)
-        const soft = this.branding.primaryColor + '15'
-        document.documentElement.style.setProperty('--brand-primary-soft', soft)
-      }
-      if (this.branding.secondaryColor) {
-        document.documentElement.style.setProperty('--brand-secondary', this.branding.secondaryColor)
-      }
-    }
+    // applyBrandingToCSS removed as colors are no longer supported
   }
 })

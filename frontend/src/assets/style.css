@@ -3,14 +3,15 @@
 html {
   margin: 0;
   padding: 0;
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
   margin: 0;
   padding: 0;
-  height: 100%;
-  background-color: #020617;
+  min-height: 100vh;
+  background-color: #f4f7fe;
+  transition: background-color 0.4s ease;
 }
 
 #app {
@@ -123,10 +124,6 @@ body.dark-mode {
 }
 
 /* Welcome route keeps dark animated background visible in light mode too */
-body.welcome-active {
-  background-color: #020617 !important;
-}
-
 body.welcome-active #app,
 body.welcome-active .app-wrapper {
   background-color: transparent !important;
@@ -625,4 +622,25 @@ body {
 .btn-ia-glow:hover svg {
   color: white;
   filter: drop-shadow(0 0 5px var(--primary));
+}
+/* Pagination Styles */
+.pagination-container { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; background: var(--card-bg); border-radius: var(--radius-lg); margin-top: 24px; border: var(--border-thin); box-shadow: var(--glass-shadow); }
+.pagination-stats { font-size: 14px; color: var(--text-muted); }
+.pagination-stats strong { color: var(--text-main); }
+.pagination-controls { display: flex; align-items: center; gap: 16px; }
+.page-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-thin); background: var(--bg-main); color: var(--text-main); font-weight: 600; font-size: 13px; cursor: pointer; transition: all var(--transition-fast); }
+.page-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.page-info { font-size: 13px; font-weight: 600; color: var(--text-main); }
+
+/* Global Theme-Aware Styling for Native Select Options */
+select option {
+  background-color: var(--card-bg, #ffffff) !important;
+  color: var(--text-main, #0f172a) !important;
+}
+
+.dark-mode select option,
+body.dark-mode select option {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
 }

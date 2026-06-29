@@ -14,7 +14,7 @@
         :accentColor="accentColor" 
         :accentDark="accentDark"
         :analyzing="isAnalyzing"
-        @back="router.push('/applications')"
+        @back="router.push({ path: '/applications', query: { jobOfferId: candidate.jobOfferId } })"
         @view-cv="viewCV"
         @schedule-interview="scheduleInterview"
         @reanalyze="reanalyzeCandidate"
@@ -79,7 +79,8 @@
     <!-- Interview Modal Component -->
     <InterviewModal 
       v-if="showInterviewModal"
-      v-model:form="interviewForm"
+      :form="interviewForm"
+      @update:form="val => interviewForm = val"
       :loading="sendingInterview"
       @close="showInterviewModal = false"
       @save="confirmScheduleInterview"
@@ -173,6 +174,7 @@ const candidate = ref({
   fullName: 'Chargement...',
   initials: '..',
   jobTitle: '',
+  jobOfferId: '',
   location: '',
   email: '',
   phone: '',
@@ -266,6 +268,36 @@ const scheduleInterview = () => {
   setTimeout(() => generateEmailTemplate(), 0)
 }
 
+watch(
+  () => [interviewForm.value.date, interviewForm.value.time, interviewForm.value.type],
+  () => {
+    generateEmailTemplate()
+  }
+)
+
+const parseDateInput = (value) => {
+  if (!value) return null
+  const normalized = String(value).trim()
+  const match = normalized.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/)
+  if (match) {
+    const day = Number(match[1])
+    const month = Number(match[2])
+    let year = Number(match[3])
+    if (year < 100) year += 2000
+    const date = new Date(year, month - 1, day)
+    if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+      return date
+    }
+  }
+  const parsed = new Date(normalized)
+  return isNaN(parsed.getTime()) ? null : parsed
+}
+
+const formatLocalizedDate = (value) => {
+  const date = parseDateInput(value)
+  return date ? date.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : value
+}
+
 const generateEmailTemplate = () => {
   const name = candidate.value?.fullName || 'Candidat'
   const job = candidate.value?.jobTitle || 'le poste'
@@ -278,7 +310,7 @@ const generateEmailTemplate = () => {
   let dateTimeInfo = ''
   if (interviewForm.value.date || interviewForm.value.time) {
     const datePart = interviewForm.value.date
-      ? new Date(interviewForm.value.date).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+      ? formatLocalizedDate(interviewForm.value.date)
       : '[date à confirmer]'
     const timePart = interviewForm.value.time || '[heure à confirmer]'
     dateTimeInfo = `\n\nDate : ${datePart}\nHeure : ${timePart}`
@@ -299,14 +331,16 @@ const generateEmailTemplate = () => {
 const confirmScheduleInterview = async () => {
   sendingInterview.value = true
   const id = route.params.id
+  const payload = {
+    date: interviewForm.value.date,
+    time: interviewForm.value.time,
+    type: interviewForm.value.type,
+    subject: interviewForm.value.subject,
+    message: interviewForm.value.message
+  }
+  console.debug('Interview request payload:', payload)
   try {
-    await api.post(`/recruiter/applications/${id}/interviews`, {
-      date: interviewForm.value.date,
-      time: interviewForm.value.time,
-      type: interviewForm.value.type,
-      subject: interviewForm.value.subject,
-      message: interviewForm.value.message
-    })
+    await api.post(`/recruiter/applications/${id}/interviews`, payload)
     timeline.value.unshift({
       id: Date.now(),
       title: 'Entretien Planifié',
@@ -318,8 +352,11 @@ const confirmScheduleInterview = async () => {
     currentStage.value = 'interview'
     toastStore.show('Invitation d\'entretien envoyée avec succès !', 'success')
   } catch (err) {
-    console.error('Erreur planification entretien:', err)
-    toastStore.show('Erreur lors de l\'envoi de l\'invitation.', 'error')
+    const response = err?.response
+    const data = response?.data
+    const message = data?.message || (typeof data === 'string' ? data : JSON.stringify(data)) || err?.message || 'Erreur lors de l\'envoi de l\'invitation.'
+    console.error('Erreur planification entretien:', { status: response?.status, data, message, error: err })
+    toastStore.show(message, 'error')
   } finally {
     sendingInterview.value = false
   }
@@ -337,13 +374,38 @@ const viewCV = () => {
   }
 }
 
+const statusToStageMap = {
+  0: 'submitted',
+  1: 'underreview',
+  2: 'shortlisted',
+  3: 'interview',
+  4: 'rejected',
+  5: 'accepted',
+  6: 'interviewed',
+  7: 'offersent'
+}
+
 const reanalyzeCandidate = async () => {
   const id = route.params.id
   if (!id) return
   isAnalyzing.value = true
   try {
     const res = await api.post(`/recruiter/applications/${id}/analyze`, {}, { timeout: 600000 })
-    toastStore.show(`Analyse IA terminée — Score: ${res.data.score}%`, 'success')
+
+    // Update stage in UI to match what the backend decided
+    const newStage = statusToStageMap[res.data.status] || currentStage.value
+    currentStage.value = newStage
+    recruitmentStore.updateApplicationStage(id, res.data.status)
+
+    if (newStage === 'rejected') {
+      toastStore.show(
+        `Candidat automatiquement rejeté — score IA ${res.data.score}% inférieur au seuil configuré.`,
+        'error'
+      )
+    } else {
+      toastStore.show(`Analyse IA terminée — Score: ${res.data.score}%`, 'success')
+    }
+
     // Refresh profile data to show updated AI results
     await fetchCandidate()
   } catch (err) {

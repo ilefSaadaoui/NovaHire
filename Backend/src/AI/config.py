@@ -32,11 +32,15 @@ class Settings(BaseSettings):
     tesseract_lang: str = "fra+eng"          # format Tesseract (ISO 639-3)
     ocr_min_text_threshold: int = 100        # chars en dessous duquel l'OCR se déclenche
     ocr_dpi_scale: int = 2                   # échelle de rendu pour la qualité OCR
-    # Chemin explicite vers le binaire Tesseract (Windows)
-    # Mis automatiquement si vide, sinon utilise ce chemin
-    tesseract_cmd: str = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    # Chemin Tesseract : Linux (Render cloud) ou Windows (dev local)
+    # Peut être surchargé via la variable d'environnement NOVAHIRE_TESSERACT_CMD
+    tesseract_cmd: str = os.getenv(
+        "NOVAHIRE_TESSERACT_CMD",
+        "/usr/bin/tesseract" if os.name != "nt" else r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    )
     # Formats acceptés
     supported_formats: list[str] = ["pdf", "docx", "doc", "png", "jpg", "jpeg"]
+
 
     # --- Scoring ---
     semantic_skill_threshold: float = 0.65

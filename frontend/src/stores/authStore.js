@@ -48,8 +48,8 @@ export const useAuthStore = defineStore('auth', {
     /**
      * Connexion unifiée (Recruteur, Admin, SuperAdmin)
      */
-    async login(email, password) {
-      const data = await authService.login(email, password)
+    async login(email, password, rememberMe = false) {
+      const data = await authService.login(email, password, rememberMe)
       this.token = data.token || data.accessToken
       this.userRole = data.role ? data.role.toLowerCase() : null
       this.refreshToken = data.refreshToken || null
@@ -57,8 +57,8 @@ export const useAuthStore = defineStore('auth', {
       this.mustChangePassword = data.mustChangePassword || false
       sessionStorage.setItem('mustChangePassword', this.mustChangePassword)
 
-      // Fetch user profile info immediately after login
-      await this.fetchUser()
+      // Profil : silent pour éviter déconnexion auto si /profile échoue juste après login
+      await this.fetchUser({ silent: true })
       this.applyTheme()
       return data
     },
@@ -168,15 +168,15 @@ export const useAuthStore = defineStore('auth', {
     /**
      * Récupérer les infos de l'utilisateur connecté
      */
-    async fetchUser() {
+    async fetchUser({ silent = false } = {}) {
       if (!this.token) return
 
       const API_BASE_URL =
         (import.meta.env && import.meta.env.VITE_API_URL) ||
-        'http://localhost:5000/api'
+        '/api'
 
       try {
-        const res = await api.get('/profile')
+        const res = await api.get('/profile', { silentError: silent })
         const data = res.data
 
         // Harmonize Avatar URL for global platform use

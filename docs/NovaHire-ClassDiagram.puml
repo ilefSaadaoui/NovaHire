@@ -1,0 +1,610 @@
+' =============================================================================
+' NovaHire — Diagrammes de classes
+' Conformité : OMG Unified Modeling Language (UML), version 2.5.1
+' Référence : https://www.omg.org/spec/UML/2.5.1/
+' Outil : PlantUML (notation UML 2.5.1 — multiplicités, composition, agrégation,
+'         dépendance, réalisation, énumérations, interfaces, datatypes)
+' =============================================================================
+
+@startuml NovaHire-Domain-ClassDiagram
+' --- Métadonnées UML 2.5.1 ---
+title NovaHire — Diagramme de classes (Domain)\n<<specification>> OMG UML 2.5.1
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam classFontStyle normal
+skinparam classStereotypeFontStyle italic
+skinparam packageStyle rectangle
+skinparam defaultFontName Segoe UI
+
+legend right
+  |= Symbole |= Sémantique UML 2.5.1 |
+  | *-- | Composition (partie vit avec le tout) |
+  | o-- | Agrégation (partage, cycle de vie indépendant) |
+  | --> | Association dirigée |
+  | ..> | Dépendance |
+  | ..|> | Réalisation (interface) |
+  | enum | Classifieur Enumeration |
+  | <<datatype>> | DataType / valeur embarquée |
+  | 0..1, 1, 0..*, 1..* | Multiplicités standard |
+endlegend
+
+' =============================================================================
+' ÉNUMÉRATIONS (UML 2.5.1 : Enumeration)
+' =============================================================================
+package "«package» Domain.Enums" as PkgEnums {
+  enum UserRole {
+    SuperAdmin
+    CompanyAdmin
+    Recruiter
+  }
+
+  enum CompanyStatus {
+    Pending
+    Approved
+    Rejected
+    Suspended
+  }
+
+  enum ContactMessageStatus {
+    New
+    InProgress
+    Resolved
+    Archived
+  }
+}
+
+package "«package» Domain.Entities.Enums" as PkgEntityEnums {
+  enum JobType {
+    FullTime
+    PartTime
+    Contract
+    Internship
+    Freelance
+  }
+
+  enum JobOfferStatus {
+    Draft
+    Published
+    Closed
+    Archived
+  }
+
+  enum RemotePolicy {
+    OnSite
+    Remote
+    Hybrid
+  }
+
+  enum ExperienceLevel {
+    Junior
+    Intermediate
+    Senior
+    Expert
+    Graduate
+    All
+    Beginner
+  }
+
+  enum ApplicationStatus {
+    Submitted
+    UnderReview
+    Shortlisted
+    Interview
+    Rejected
+    Accepted
+    Interviewed
+    OfferSent
+  }
+
+  enum InterviewStatus {
+    Planned
+    Completed
+    Cancelled
+    Rescheduled
+    NoShow
+  }
+}
+
+' =============================================================================
+' CLASSIFIEURS — TENANT & ORGANISATION (UML 2.5.1 : Class)
+' =============================================================================
+package "«package» Tenant & Organisation" as PkgTenant {
+
+  class Company {
+    +id : Guid
+    +name : String
+    +industry : String [0..1]
+    +contactEmail : String [0..1]
+    +primaryColor : String
+    +secondaryColor : String
+    +status : CompanyStatus
+    +isActive : Boolean
+    +createdAt : DateTime
+    __
+    +{redefines} users : User [0..*]
+    +{redefines} departments : Department [0..*]
+    +{redefines} jobOffers : JobOffer [0..*]
+  }
+
+  class Department {
+    +id : Guid
+    +name : String
+    +description : String [0..1]
+    +companyId : Guid
+    +createdAt : DateTime
+    __
+    +users : User [0..*]
+  }
+
+  class User {
+    +id : Guid
+    +firstName : String
+    +lastName : String
+    +email : String
+    +passwordHash : String
+    +role : UserRole
+    +companyId : Guid [0..1]
+    +departmentId : Guid [0..1]
+    +isActive : Boolean
+    +jobTitle : String [0..1]
+    +avatarUrl : String [0..1]
+    __
+    +fullName : String {derived}
+    +isRefreshTokenValid() : Boolean
+    +createdJobOffers : JobOffer [0..*]
+  }
+
+  class ActivityLog {
+    +id : Guid
+    +action : String
+    +details : String [0..1]
+    +userId : Guid [0..1]
+    +userEmail : String [0..1]
+    +companyId : Guid [0..1]
+    +entityType : String [0..1]
+    +entityId : String [0..1]
+    +timestamp : DateTime
+    +ipAddress : String [0..1]
+  }
+
+  class ContactMessage {
+    +id : Guid
+    +fullName : String
+    +email : String
+    +company : String [0..1]
+    +phone : String [0..1]
+    +message : String
+    +status : ContactMessageStatus
+    +createdAt : DateTime
+    +respondedAt : DateTime [0..1]
+  }
+}
+
+' =============================================================================
+' CLASSIFIEURS — RECRUTEMENT
+' =============================================================================
+package "«package» Recrutement" as PkgRecruitment {
+
+  class JobOffer {
+    +id : Guid
+    +title : String
+    +description : String
+    +type : JobType
+    +status : JobOfferStatus
+    +remotePolicy : RemotePolicy [0..1]
+    +experienceLevel : ExperienceLevel [0..1]
+    +skills : String [0..*]
+    +companyId : Guid
+    +createdById : Guid
+    +weightExperience : Integer
+    +weightEducation : Integer
+    +weightSkills : Integer
+    +autoRejectThreshold : Integer
+    +shareToken : String [0..1]
+    +publishedAt : DateTime [0..1]
+    __
+    +formConfig : ApplicationFormConfig
+    +displayConfig : PublicDisplayConfig
+    +applications : JobApplication [0..*]
+    +publish() : void
+    +close() : void
+    +isActive() : Boolean
+  }
+
+  class Candidate {
+    +id : Guid
+    +firstName : String
+    +lastName : String
+    +email : String
+    +phoneNumber : String [0..1]
+    +linkedInUrl : String [0..1]
+    +portfolioUrl : String [0..1]
+    +mainCVUrl : String [0..1]
+    +companyId : Guid
+    +createdAt : DateTime
+    __
+    +applications : JobApplication [0..*]
+  }
+
+  class JobApplication {
+    +id : Guid
+    +jobOfferId : Guid
+    +candidateId : Guid
+    +cvUrl : String
+    +coverLetterUrl : String [0..1]
+    +status : ApplicationStatus
+    +customFieldsData : Map<String,String>
+    +aiScore : Integer [0..1]
+    +quizSent : Boolean
+    +quizScore : Integer [0..1]
+    +quizExpiresAt : DateTime [0..1]
+    +offerLetterContent : String [0..1]
+    +recruiterNotes : String [0..1]
+    +source : String [0..1]
+    +reviewedById : Guid [0..1]
+    +reviewedAt : DateTime [0..1]
+    +appliedAt : DateTime
+    +updatedAt : DateTime [0..1]
+    __
+    +aiAnalysis : AIAnalysisResult [0..1]
+    +comments : JobApplicationComment [0..*]
+    +ratings : ApplicationRating [0..*]
+    +notifications : Notification [0..*]
+    +updateStatus(status : ApplicationStatus, reviewerId : Guid) : void
+  }
+
+  class Interview {
+    +id : Guid
+    +jobApplicationId : Guid
+    +recruiterId : Guid
+    +scheduledAt : DateTime
+    +type : String
+    +locationOrLink : String [0..1]
+    +message : String [0..1]
+    +status : InterviewStatus
+    +createdAt : DateTime
+    +updatedAt : DateTime [0..1]
+  }
+
+  class JobApplicationComment {
+    +id : Guid
+    +jobApplicationId : Guid
+    +authorId : Guid
+    +content : String
+    +parentCommentId : Guid [0..1]
+    +createdAt : DateTime
+  }
+
+  class ApplicationRating {
+    +id : Guid
+    +jobApplicationId : Guid
+    +recruiterId : Guid
+    +score : Integer {1..5}
+    +comment : String [0..1]
+    +createdAt : DateTime
+  }
+
+  class Notification {
+    +id : Guid
+    +jobApplicationId : Guid
+    +title : String
+    +message : String
+    +isRead : Boolean
+    +type : String [0..1]
+    +createdAt : DateTime
+  }
+}
+
+' =============================================================================
+' CLASSIFIEURS — QUIZ
+' =============================================================================
+package "«package» Évaluation" as PkgQuiz {
+
+  class Quiz {
+    +id : Guid
+    +jobOfferId : Guid
+    +title : String
+    +description : String
+    +timeLimitMinutes : Integer
+    +isActive : Boolean
+    +createdAt : DateTime
+    __
+    +questions : QuizQuestion [1..*]
+  }
+
+  class QuizQuestion {
+    +id : Guid
+    +quizId : Guid
+    +text : String
+    +type : String
+    +optionsJson : String
+    +correctAnswerIndex : Integer
+    +explanation : String
+  }
+
+  class CandidateQuizResult {
+    +id : Guid
+    +jobApplicationId : Guid
+    +quizId : Guid
+    +score : Real
+    +candidateAnswersJson : String
+    +completedAt : DateTime
+  }
+}
+
+' =============================================================================
+' DATATYPES (UML 2.5.1 : DataType — owned / embarqués EF Core)
+' =============================================================================
+package "«package» Value Types" as PkgDataTypes {
+
+  class ApplicationFormConfig <<datatype>> {
+    +requireFullName : Boolean
+    +requireEmail : Boolean
+    +requirePhone : Boolean
+    +requireCV : Boolean
+    +requireCoverLetter : Boolean
+    +requirePortfolio : Boolean
+    +requireLinkedIn : Boolean
+    +customFields : String [0..*]
+    +requiredDocuments : String [0..*]
+  }
+
+  class PublicDisplayConfig <<datatype>> {
+    +showCompanyName : Boolean
+    +showCompanyLogo : Boolean
+    +showSalary : Boolean
+    +showLocation : Boolean
+    +customCSS : String [0..1]
+    +headerImageUrl : String [0..1]
+  }
+
+  class AIAnalysisResult <<datatype>> {
+    +overallScore : Integer
+    +experienceScore : Integer
+    +educationScore : Integer
+    +skillsScore : Integer
+    +totalYearsExperience : Real
+    +autoGeneratedSummary : String [0..1]
+    +identifiedSkills : String [0..*]
+    +strengths : String [0..*]
+    +weaknesses : String [0..*]
+    +aiRecommendation : String [0..1]
+    +analyzedAt : DateTime
+    __
+    +extractedData : ExtractedCVData [0..1]
+    +interviewQuestions : InterviewQuestionRecord [0..*]
+  }
+
+  class ExtractedCVData <<datatype>> {
+    +workExperiences : WorkExperience [0..*]
+    +educations : Education [0..*]
+    +skills : String [0..*]
+    +languages : String [0..*]
+    +certifications : String [0..*]
+  }
+
+  class WorkExperience <<datatype>> {
+    +jobTitle : String
+    +company : String
+    +startDate : DateTime [0..1]
+    +endDate : DateTime [0..1]
+    +isCurrent : Boolean
+    +description : String [0..1]
+  }
+
+  class Education <<datatype>> {
+    +degree : String
+    +institution : String
+    +fieldOfStudy : String [0..1]
+    +startDate : DateTime [0..1]
+    +endDate : DateTime [0..1]
+    +gpa : String [0..1]
+  }
+
+  class InterviewQuestionRecord <<datatype>> {
+    +category : String
+    +question : String
+    +purpose : String
+    +score : Integer [0..1]
+    +notes : String [0..1]
+  }
+}
+
+' =============================================================================
+' ASSOCIATIONS & COMPOSITIONS (UML 2.5.1 — multiplicités aux deux extrémités)
+' =============================================================================
+
+' --- Tenant ---
+Company "1" o-- "0..*" User : employs
+Company "1" *-- "0..*" Department : contains
+Company "1" *-- "0..*" JobOffer : publishes
+Company "1" o-- "0..*" Candidate : registers
+Department "1" o-- "0..*" User : assigns
+
+ActivityLog ..> Company : «derive»\ncompanyId
+
+' --- Recrutement ---
+User "1" o-- "0..*" JobOffer : creates
+JobOffer "0..*" --> "1" Company : tenant
+JobOffer "0..*" --> "1" User : createdBy
+JobOffer "1" *-- "0..*" JobApplication : receives
+Candidate "1" *-- "0..*" JobApplication : submits
+JobApplication "0..*" --> "1" JobOffer
+JobApplication "0..*" --> "1" Candidate
+JobApplication "0..*" --> "0..1" User : reviewedBy
+
+' --- Composition datatypes (owned) ---
+JobOffer "1" *-- "1" ApplicationFormConfig : formConfig
+JobOffer "1" *-- "1" PublicDisplayConfig : displayConfig
+JobApplication "1" *-- "0..1" AIAnalysisResult : aiAnalysis
+AIAnalysisResult "1" *-- "0..1" ExtractedCVData : extractedData
+ExtractedCVData "1" *-- "0..*" WorkExperience
+ExtractedCVData "1" *-- "0..*" Education
+AIAnalysisResult "1" *-- "0..*" InterviewQuestionRecord
+
+' --- Éléments liés à JobApplication ---
+JobApplication "1" *-- "0..*" JobApplicationComment : comments
+JobApplication "1" *-- "0..*" ApplicationRating : ratings
+JobApplication "1" *-- "0..*" Notification : notifications
+JobApplication "1" *-- "0..*" Interview : schedules
+Interview "0..*" --> "1" User : recruiter
+JobApplicationComment "0..*" --> "1" User : author
+ApplicationRating "0..*" --> "1" User : recruiter
+
+' --- Quiz ---
+JobOffer "1" *-- "0..*" Quiz : hasQuiz
+Quiz "1" *-- "1..*" QuizQuestion : contains
+JobApplication "1" o-- "0..*" CandidateQuizResult : quizResults
+Quiz "1" o-- "0..*" CandidateQuizResult
+CandidateQuizResult "0..*" --> "1" JobApplication
+CandidateQuizResult "0..*" --> "1" Quiz
+
+note top of Company
+  **Classifier Company**
+  Racine du tenant (multi-sociétés).
+  Conforme UML 2.5.1 : Class + associations
+  avec multiplicités explicites.
+end note
+
+note bottom of JobApplication
+  **Agrégat métier central**
+  Composition vers commentaires,
+  notes, notifications, entretiens
+  et datatype AIAnalysisResult.
+end note
+
+note as UMLNote
+  **Profil de modélisation**
+  Types primitifs mappés UML 2.5.1 :
+  String, Boolean, Integer, Real, DateTime.
+  Guid et Map<> = types applicatifs C#.
+  Énumérations : classifieurs Enumeration séparés.
+end note
+
+@enduml
+
+
+@startuml NovaHire-Application-Layer
+title NovaHire — Couche application & infrastructure\n<<specification>> OMG UML 2.5.1
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "«package» Application.Interfaces" as PkgApp {
+  interface IAuthService <<interface>> {
+    +login() : AuthResult
+    +register() : void
+  }
+
+  interface IJwtTokenService <<interface>> {
+    +generateToken() : String
+    +validateToken() : Boolean
+  }
+
+  interface ICurrentUserService <<interface>> {
+    +companyId : Guid [0..1]
+    +role : String
+  }
+
+  interface IUserRepository <<interface>>
+  interface ICompanyRepository <<interface>>
+  interface IJobOfferRepository <<interface>>
+  interface IJobApplicationRepository <<interface>>
+  interface IAIService <<interface>> {
+    +analyzeApplication() : AIAnalysisResult
+  }
+  interface IEmailService <<interface>>
+  interface IStorageService <<interface>>
+  interface IExportService <<interface>>
+}
+
+package "«package» Infrastructure" as PkgInfra {
+  class ApplicationDbContext {
+    +saveChanges() : Integer
+  }
+  class AuthService
+  class JwtTokenService
+  class AIAnalysisService
+  class CloudinaryService
+  class SmtpEmailService
+  class CurrentUserService
+}
+
+package "«package» API" as PkgApi {
+  class AuthController
+  class RecruiterController
+  class JobOfferController
+  class QuizController
+  class CompanyAdminController
+  class AdminController
+  class PublicController
+  class ProfileController
+}
+
+' UML 2.5.1 : Realization (interface implementation)
+AuthService ..|> IAuthService
+JwtTokenService ..|> IJwtTokenService
+AIAnalysisService ..|> IAIService
+CloudinaryService ..|> IStorageService
+SmtpEmailService ..|> IEmailService
+CurrentUserService ..|> ICurrentUserService
+
+' UML 2.5.1 : Dependency
+ApplicationDbContext ..> ICurrentUserService : uses
+AuthController ..> IAuthService
+RecruiterController ..> IJobApplicationRepository
+RecruiterController ..> IAIService
+JobOfferController ..> IJobOfferRepository
+PublicController ..> IJobOfferRepository
+IAIService ..> JobApplication : «parameter»
+IJobApplicationRepository ..> JobApplication : «parameter»
+
+@enduml
+
+
+@startuml NovaHire-UseCase-Diagram
+title NovaHire — Diagramme de cas d'utilisation\n<<specification>> OMG UML 2.5.1
+
+skinparam shadowing false
+left to right direction
+
+actor "SuperAdmin" as SA
+actor "CompanyAdmin" as CA
+actor "Recruiter" as REC
+actor "Candidat" as CAND
+
+rectangle "Système NovaHire" as System {
+
+  usecase "UC01\nGérer les sociétés (tenants)" as UC01
+  usecase "UC02\nConfigurer le branding" as UC02
+  usecase "UC03\nGérer utilisateurs\net départements" as UC03
+  usecase "UC04\nCréer et publier\nune offre d'emploi" as UC04
+  usecase "UC05\nTraiter le pipeline\nde candidatures (IA)" as UC05
+  usecase "UC06\nPlanifier des entretiens" as UC06
+  usecase "UC07\nGérer les quiz\nde présélection" as UC07
+  usecase "UC08\nPostuler via\nlien public" as UC08
+}
+
+' UML 2.5.1 : Association acteur — cas d'utilisation
+SA --> UC01
+CA --> UC02
+CA --> UC03
+REC --> UC04
+REC --> UC05
+REC --> UC06
+REC --> UC07
+CAND --> UC08
+CAND --> UC07
+
+' UML 2.5.1 : Include (optionnel — flux candidature)
+UC08 ..> UC05 : <<include>>\n(enregistrement candidature)
+
+note right of System
+  Frontière du système (UML 2.5.1 Subject).
+  Acteurs externes : rôles métier NovaHire.
+end note
+
+@enduml

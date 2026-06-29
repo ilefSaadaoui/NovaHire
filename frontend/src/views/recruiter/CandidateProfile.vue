@@ -6,7 +6,7 @@
       
       <header class="r-topbar anim-reveal-down">
         <div class="r-welcome" style="display: flex; flex-direction: row !important; align-items: center; gap: 20px;">
-          <button class="back-link-premium" @click="$router.push('/candidatures')" title="Retour">
+          <button class="back-link-premium" @click="$router.push({ path: '/candidatures', query: { jobOfferId: candidate.jobOfferId } })" title="Retour">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 24px; height: 24px;"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div class="header-details-premium">
@@ -635,7 +635,7 @@ export default {
       const id = this.$route.params.id
       try {
         await api.post(`/recruiter/applications/${id}/interviews`, {
-          date: this.interviewForm.date,
+          date: new Date(`${this.interviewForm.date}T00:00:00`),
           time: this.interviewForm.time,
           type: this.interviewForm.type,
           subject: this.interviewForm.subject,

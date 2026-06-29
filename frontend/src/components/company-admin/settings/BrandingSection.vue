@@ -12,144 +12,126 @@
       </button>
     </div>
 
-    <div class="branding-layout">
-      <!-- Left: Form -->
-      <div class="branding-form">
-        <!-- Company Name -->
-        <div class="form-section">
-          <div class="form-section-header">
-            <Building2 :size="16" class="form-section-icon" />
-            <span>Identité</span>
-          </div>
-          <div class="input-group">
-            <label class="input-label">Nom de l'entreprise</label>
-            <div class="input-wrap">
-              <input type="text" :value="form.companyName" @input="$emit('update:form', { ...form, companyName: $event.target.value })" class="input-field" placeholder="Votre entreprise">
-            </div>
-          </div>
-          <div class="input-group">
-            <label class="input-label">Description</label>
-            <div class="input-wrap">
-              <textarea :value="form.description" @input="$emit('update:form', { ...form, description: $event.target.value })" class="input-field textarea" rows="3" placeholder="Décrivez votre entreprise en quelques mots..."></textarea>
-            </div>
+    <div class="branding-form-centered">
+      <!-- Identité -->
+      <div class="form-section">
+        <div class="form-section-header">
+          <Building2 :size="16" class="form-section-icon" />
+          <span>Identité</span>
+        </div>
+
+        <!-- Nom de l'entreprise -->
+        <div class="input-group">
+          <label class="input-label">Nom de l'entreprise</label>
+          <div class="input-wrap">
+            <input type="text" :value="form.companyName" @input="$emit('update:form', { ...form, companyName: $event.target.value })" class="input-field" placeholder="Votre entreprise">
           </div>
         </div>
 
-        <!-- Industry & Website -->
-        <div class="form-section">
-          <div class="form-section-header">
-            <Globe :size="16" class="form-section-icon" />
-            <span>Informations</span>
-          </div>
-          <div class="form-row">
-            <div class="input-group flex-1">
-              <label class="input-label">Secteur d'activité</label>
-              <div class="input-wrap">
-                <input type="text" :value="form.industry" @input="$emit('update:form', { ...form, industry: $event.target.value })" class="input-field" placeholder="Ex: Technologie">
-              </div>
-            </div>
-            <div class="input-group flex-1">
-              <label class="input-label">Site Web</label>
-              <div class="input-wrap">
-                <Link :size="15" class="input-icon" />
-                <input type="text" :value="form.website" @input="$emit('update:form', { ...form, website: $event.target.value })" class="input-field" placeholder="https://...">
-              </div>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="input-group flex-1">
-              <label class="input-label">Pays</label>
-              <div class="input-wrap">
-                <MapPin :size="15" class="input-icon" />
-                <input type="text" :value="form.country" @input="$emit('update:form', { ...form, country: $event.target.value })" class="input-field" placeholder="Ex: France">
-              </div>
-            </div>
-            <div class="input-group flex-1">
-              <label class="input-label">Téléphone</label>
-              <div class="input-wrap">
-                <Phone :size="15" class="input-icon" />
-                <input type="text" :value="form.contactPhone" @input="$emit('update:form', { ...form, contactPhone: $event.target.value })" class="input-field" placeholder="+33 6...">
-              </div>
-            </div>
+        <!-- Description -->
+        <div class="input-group">
+          <label class="input-label">Description</label>
+          <div class="input-wrap">
+            <textarea :value="form.description" @input="$emit('update:form', { ...form, description: $event.target.value })" class="input-field textarea" rows="3" placeholder="Décrivez votre entreprise en quelques mots..."></textarea>
           </div>
         </div>
 
-        <!-- Colors & Logo -->
-        <div class="form-section">
-          <div class="form-section-header">
-            <Palette :size="16" class="form-section-icon" />
-            <span>Apparence</span>
-          </div>
-          <div class="form-row">
-            <div class="input-group flex-1">
-              <label class="input-label">Couleur principale</label>
-              <div class="color-picker-wrap">
-                <div class="color-swatch" :style="{ background: form.primaryColor }">
-                  <input type="color" :value="form.primaryColor" @input="$emit('update:form', { ...form, primaryColor: $event.target.value })" class="color-input-hidden">
-                </div>
-                <input type="text" :value="form.primaryColor" @input="$emit('update:form', { ...form, primaryColor: $event.target.value })" class="input-field color-hex">
-              </div>
-            </div>
-            <div class="input-group flex-1">
-              <label class="input-label">Couleur secondaire</label>
-              <div class="color-picker-wrap">
-                <div class="color-swatch" :style="{ background: form.secondaryColor }">
-                  <input type="color" :value="form.secondaryColor" @input="$emit('update:form', { ...form, secondaryColor: $event.target.value })" class="color-input-hidden">
-                </div>
-                <input type="text" :value="form.secondaryColor" @input="$emit('update:form', { ...form, secondaryColor: $event.target.value })" class="input-field color-hex">
-              </div>
+        <!-- Logo Upload -->
+        <div class="input-group">
+          <label class="input-label">{{ $t('settings.branding.logo') }}</label>
+
+          <!-- État : logo existant -->
+          <div v-if="form.logoUrl && !logoPreview" class="logo-preview-wrap">
+            <img :src="form.logoUrl" class="logo-preview-img" alt="Logo actuel" />
+            <div class="logo-preview-meta">
+              <span class="logo-preview-name">Logo actuel</span>
+              <button class="logo-remove-btn" @click="removeLogo" :disabled="logoUploading" title="Supprimer le logo">
+                <X :size="14" />
+              </button>
             </div>
           </div>
-          <div class="input-group">
-            <label class="input-label">{{ $t('settings.branding.logo') }}</label>
-            <div class="input-wrap">
-              <Image :size="15" class="input-icon" />
-              <input type="text" :value="form.logoUrl" @input="$emit('update:form', { ...form, logoUrl: $event.target.value })" class="input-field" placeholder="https://votre-logo.png">
+
+          <!-- État : nouveau logo uploadé (aperçu local) -->
+          <div v-else-if="logoPreview" class="logo-preview-wrap">
+            <img :src="logoPreview" class="logo-preview-img" alt="Nouveau logo" />
+            <div class="logo-preview-meta">
+              <span class="logo-preview-name logo-uploading-label">
+                <Loader2 v-if="logoUploading" class="spin-sm" :size="12" />
+                {{ logoUploading ? 'Envoi en cours...' : 'Nouveau logo' }}
+              </span>
+              <button v-if="!logoUploading" class="logo-remove-btn" @click="cancelLogoPreview" title="Annuler">
+                <X :size="14" />
+              </button>
             </div>
           </div>
+
+          <!-- Zone de drop / sélection -->
+          <div
+            v-else
+            class="logo-drop-zone"
+            :class="{ 'logo-drop-active': logoDragOver, 'logo-drop-error': logoUploadError }"
+            @click="triggerLogoInput"
+            @dragover.prevent="logoDragOver = true"
+            @dragleave.prevent="logoDragOver = false"
+            @drop.prevent="handleLogoDrop"
+          >
+            <div class="logo-drop-icon-wrap">
+              <Upload :size="22" class="logo-drop-icon" />
+            </div>
+            <p class="logo-drop-text">
+              <span class="logo-drop-link">Cliquez pour importer</span> ou glissez votre logo ici
+            </p>
+            <p class="logo-drop-hint">PNG, JPG, WebP — max 2 Mo</p>
+            <input
+              ref="logoFileInput"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              hidden
+              @change="handleLogoFile"
+            />
+          </div>
+
+          <!-- Message d'erreur -->
+          <p v-if="logoUploadError" class="logo-error-msg">
+            <AlertCircle :size="12" /> {{ logoUploadError }}
+          </p>
         </div>
       </div>
 
-      <!-- Right: Live Preview -->
-      <div class="branding-preview">
-        <div class="preview-label">
-          <Eye :size="14" />
-          <span>Aperçu en direct</span>
+      <!-- Informations -->
+      <div class="form-section">
+        <div class="form-section-header">
+          <Globe :size="16" class="form-section-icon" />
+          <span>Informations</span>
         </div>
-        <div class="preview-container">
-          <div class="preview-device">
-            <!-- Browser Chrome -->
-            <div class="browser-chrome">
-              <div class="browser-dots">
-                <span class="dot red"></span>
-                <span class="dot yellow"></span>
-                <span class="dot green"></span>
-              </div>
-              <div class="browser-address">{{ form.website || 'votre-site.com' }}</div>
+        <div class="form-row">
+          <div class="input-group flex-1">
+            <label class="input-label">Secteur d'activité</label>
+            <div class="input-wrap">
+              <input type="text" :value="form.industry" @input="$emit('update:form', { ...form, industry: $event.target.value })" class="input-field" placeholder="Secteur">
             </div>
-            <!-- Page Content -->
-            <div class="preview-page" :style="{ '--brand': form.primaryColor, '--brand-alt': form.secondaryColor }">
-              <div class="preview-nav">
-                <img v-if="form.logoUrl" :src="form.logoUrl" class="preview-logo-img">
-                <div v-else class="preview-logo-text" :style="{ color: form.primaryColor }">{{ form.companyName || 'Logo' }}</div>
-                <div class="preview-nav-links">
-                  <span class="nav-dot"></span>
-                  <span class="nav-dot"></span>
-                  <span class="nav-dot"></span>
-                </div>
-              </div>
-              <div class="preview-hero">
-                <div class="preview-badge" :style="{ background: form.primaryColor + '15', color: form.primaryColor }">
-                  Nous recrutons
-                </div>
-                <div class="preview-hero-title">
-                  Rejoignez <span :style="{ color: form.primaryColor }">{{ form.companyName || 'l\'équipe' }}</span>
-                </div>
-                <div class="preview-hero-desc">{{ form.description || 'Découvrez nos opportunités de carrière' }}</div>
-                <div class="preview-cta" :style="{ background: form.primaryColor }">
-                  Postuler maintenant
-                </div>
-              </div>
+          </div>
+          <div class="input-group flex-1">
+            <label class="input-label">Site Web</label>
+            <div class="input-wrap">
+              <Link :size="15" class="input-icon" />
+              <input type="text" :value="form.website" @input="$emit('update:form', { ...form, website: $event.target.value })" class="input-field" placeholder="URL">
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="input-group flex-1">
+            <label class="input-label">Pays</label>
+            <div class="input-wrap">
+              <MapPin :size="15" class="input-icon" />
+              <input type="text" :value="form.country" @input="$emit('update:form', { ...form, country: $event.target.value })" class="input-field" placeholder="Pays">
+            </div>
+          </div>
+          <div class="input-group flex-1">
+            <label class="input-label">Téléphone</label>
+            <div class="input-wrap">
+              <Phone :size="15" class="input-icon" />
+              <input type="text" :value="form.contactPhone" @input="$emit('update:form', { ...form, contactPhone: $event.target.value })" class="input-field" placeholder="Numéro">
             </div>
           </div>
         </div>
@@ -159,19 +141,102 @@
 </template>
 
 <script setup>
-import { Save, Loader2, Building2, Globe, Link, MapPin, Phone, Palette, Image, Eye } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { Save, Loader2, Building2, Globe, Link, MapPin, Phone, X, Upload, AlertCircle } from 'lucide-vue-next'
+import api from '@/api/axios'
 
-defineProps({
+const props = defineProps({
   form: Object,
   isSaving: Boolean
 })
 
-defineEmits(['save', 'update:form'])
+const emit = defineEmits(['save', 'update:form'])
+
+// ── Logo upload state ──────────────────────────────────────────────
+const logoFileInput = ref(null)
+const logoPreview   = ref('')
+const logoUploading = ref(false)
+const logoUploadError = ref('')
+const logoDragOver  = ref(false)
+
+const triggerLogoInput = () => {
+  if (logoFileInput.value) logoFileInput.value.click()
+}
+
+const handleLogoDrop = (e) => {
+  logoDragOver.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) processLogoFile(file)
+}
+
+const handleLogoFile = (e) => {
+  const file = e.target?.files?.[0]
+  if (file) processLogoFile(file)
+}
+
+const processLogoFile = async (file) => {
+  logoUploadError.value = ''
+
+  const allowed = ['image/png', 'image/jpeg', 'image/webp']
+  if (!allowed.includes(file.type)) {
+    logoUploadError.value = 'Format non supporté. Utilisez PNG, JPG ou WebP.'
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    logoUploadError.value = 'Fichier trop volumineux. Maximum 2 Mo.'
+    return
+  }
+
+  // Aperçu local instantané
+  logoPreview.value = URL.createObjectURL(file)
+  logoUploading.value = true
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await api.post('/companyadmin/branding/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+
+    // Mettre à jour le form avec l'URL Cloudinary
+    emit('update:form', { ...props.form, logoUrl: res.data.logoUrl })
+    logoPreview.value = ''
+  } catch (err) {
+    logoUploadError.value = err?.response?.data?.message || 'Erreur lors de l\'envoi. Réessayez.'
+    logoPreview.value = ''
+  } finally {
+    logoUploading.value = false
+    if (logoFileInput.value) logoFileInput.value.value = ''
+  }
+}
+
+const removeLogo = () => {
+  emit('update:form', { ...props.form, logoUrl: '' })
+  logoPreview.value = ''
+  logoUploadError.value = ''
+}
+
+const cancelLogoPreview = () => {
+  logoPreview.value = ''
+  logoUploadError.value = ''
+  if (logoFileInput.value) logoFileInput.value.value = ''
+}
 </script>
 
 <style scoped>
-.admin-glass-card { background: var(--card-bg); border: 1px solid var(--r-border); border-radius: 32px; padding: 32px; }
-.section-header-premium { display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px; }
+.admin-glass-card {
+  background: var(--card-bg);
+  border: 1px solid var(--r-border);
+  border-radius: 32px;
+  padding: 32px;
+}
+.section-header-premium {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 36px;
+}
 .celestial-title { font-size: 20px; font-weight: 900; color: var(--r-text-main); letter-spacing: -0.5px; }
 .section-subtitle { font-size: 13px; color: var(--r-text-sub); margin-top: 4px; font-weight: 600; }
 
@@ -197,19 +262,25 @@ defineEmits(['save', 'update:form'])
 .btn-save-branding:active { transform: translateY(1px); box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
 .btn-save-branding:disabled { opacity: 0.7; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
-/* ─── Layout ─── */
-.branding-layout {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start;
+/* ─── Centred layout ─── */
+.branding-form-centered {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 780px;
+  margin: 0 auto;
 }
 
-/* ─── Form ─── */
-.branding-form { display: flex; flex-direction: column; gap: 28px; }
-
+/* ─── Sections ─── */
 .form-section {
-  background: rgba(0,0,0,0.015); border: 1px solid var(--r-border);
-  border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 16px;
+  background: rgba(0,0,0,0.015);
+  border: 1px solid var(--r-border);
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-
 .form-section-header {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 900; color: var(--accent);
@@ -235,14 +306,12 @@ defineEmits(['save', 'update:form'])
 .input-wrap:focus-within {
   border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.08);
 }
-
 .input-field {
   flex: 1; background: transparent; border: none; outline: none;
   color: var(--r-text-main); font-weight: 700; font-size: 13px;
   font-family: inherit;
 }
 .textarea { min-height: 70px; resize: vertical; }
-
 .input-icon { color: var(--r-text-sub); opacity: 0.6; flex-shrink: 0; }
 
 /* ─── Color Picker ─── */
@@ -254,7 +323,6 @@ defineEmits(['save', 'update:form'])
 .color-picker-wrap:focus-within {
   border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.08);
 }
-
 .color-swatch {
   width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
   border: 2px solid rgba(0,0,0,0.08); position: relative;
@@ -265,87 +333,97 @@ defineEmits(['save', 'update:form'])
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
   opacity: 0; cursor: pointer;
 }
-.color-hex { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+.color-hex { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; color: var(--r-text-main); font-weight: 700; }
 
-/* ─── Preview ─── */
-.branding-preview { position: sticky; top: 32px; }
-
-.preview-label {
-  display: flex; align-items: center; gap: 8px; justify-content: center;
-  font-size: 11px; font-weight: 800; color: var(--r-text-sub);
-  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;
+/* ─── Logo upload zone ─── */
+.logo-drop-zone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 28px 20px;
+  border: 2px dashed var(--r-border); border-radius: 16px;
+  cursor: pointer; transition: all 0.25s;
+  background: rgba(0,0,0,0.01);
+  text-align: center;
 }
-
-.preview-container {
-  background: linear-gradient(145deg, #f0f4f8, #e2e8f0);
-  padding: 32px; border-radius: 24px; border: 1px solid var(--r-border);
+.logo-drop-zone:hover,
+.logo-drop-active {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.04);
 }
-
-.preview-device {
-  background: white; border-radius: 16px; overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e2e8f0;
+.logo-drop-error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.04);
 }
-
-/* Browser Chrome */
-.browser-chrome {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
-}
-.browser-dots { display: flex; gap: 6px; }
-.dot { width: 10px; height: 10px; border-radius: 50%; }
-.dot.red { background: #f87171; }
-.dot.yellow { background: #fbbf24; }
-.dot.green { background: #34d399; }
-.browser-address {
-  flex: 1; background: white; padding: 5px 12px; border-radius: 6px;
-  font-size: 10px; color: #94a3b8; font-weight: 600;
-  border: 1px solid #e2e8f0; text-align: center;
-}
-
-/* Page Content */
-.preview-page { background: white; min-height: 280px; display: flex; flex-direction: column; }
-
-.preview-nav {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 20px; border-bottom: 1px solid #f1f5f9;
-}
-.preview-logo-img { height: 18px; }
-.preview-logo-text { font-weight: 900; font-size: 13px; letter-spacing: -0.3px; }
-.preview-nav-links { display: flex; gap: 8px; }
-.nav-dot { width: 28px; height: 4px; background: #e2e8f0; border-radius: 4px; }
-
-.preview-hero {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 12px;
-  padding: 28px 20px; text-align: center;
-}
-
-.preview-badge {
-  padding: 5px 14px; border-radius: 100px;
-  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
-}
-
-.preview-hero-title {
-  font-size: 18px; font-weight: 900; color: #1e293b; letter-spacing: -0.5px;
-  line-height: 1.2;
-}
-
-.preview-hero-desc {
-  font-size: 10px; color: #94a3b8; font-weight: 600;
-  max-width: 240px; line-height: 1.5;
-}
-
-.preview-cta {
-  padding: 8px 20px; color: white; border-radius: 8px;
-  font-weight: 800; font-size: 10px; text-transform: uppercase;
-  letter-spacing: 0.5px; margin-top: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+.logo-drop-icon-wrap {
+  width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(var(--accent-rgb), 0.08);
+  display: flex; align-items: center; justify-content: center;
   transition: transform 0.2s;
 }
+.logo-drop-zone:hover .logo-drop-icon-wrap,
+.logo-drop-active .logo-drop-icon-wrap { transform: scale(1.1); }
+.logo-drop-icon { color: var(--accent); }
+.logo-drop-text {
+  font-size: 13px; font-weight: 600; color: var(--r-text-sub);
+  margin: 0;
+}
+.logo-drop-link {
+  color: var(--accent); font-weight: 800; text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.logo-drop-hint {
+  font-size: 11px; color: var(--r-text-sub); opacity: 0.7; margin: 0;
+}
 
+/* ─── Logo preview ─── */
+.logo-preview-wrap {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 18px;
+  background: rgba(0,0,0,0.015);
+  border: 1px solid var(--r-border);
+  border-radius: 16px;
+}
+.logo-preview-img {
+  height: 52px; max-width: 140px;
+  object-fit: contain; border-radius: 10px;
+  border: 1px solid var(--r-border);
+  padding: 6px; background: white;
+}
+.logo-preview-meta {
+  display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 12px;
+}
+.logo-preview-name {
+  font-size: 13px; font-weight: 700; color: var(--r-text-main);
+  display: flex; align-items: center; gap: 6px;
+}
+.logo-uploading-label { color: var(--accent); }
+.logo-remove-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid var(--r-border);
+  background: rgba(239, 68, 68, 0.06); color: #ef4444;
+  cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+}
+.logo-remove-btn:hover { background: rgba(239, 68, 68, 0.12); transform: scale(1.1); }
+.logo-remove-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ─── Error message ─── */
+.logo-error-msg {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #ef4444;
+  margin: 0; padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: 8px;
+}
+
+/* ─── Animations ─── */
 .spin { animation: rotate 2s linear infinite; }
+.spin-sm { animation: rotate 1.5s linear infinite; }
 @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .anim-reveal-up { animation: revealUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes revealUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ─── Responsive ─── */
+@media (max-width: 640px) {
+  .form-row { flex-direction: column; }
+}
 </style>

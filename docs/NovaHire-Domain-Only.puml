@@ -1,0 +1,195 @@
+@startuml NovaHire-Domaine-Metier-Relations
+title NovaHire - Diagramme de classes METIER\nFocus RELATIONS (UML 2.5.1)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam ArrowThickness 1.2
+
+hide empty members
+
+' =============================================================================
+' CONCEPTS METIER
+' =============================================================================
+
+package "Organisation" #E8F4FD {
+  class Societe <<concept>>
+  class Departement <<concept>>
+  class Collaborateur <<concept>>
+}
+
+package "Recrutement" #E8F5E9 {
+  class OffreEmploi <<concept>>
+  class Candidat <<concept>>
+  class Candidature <<concept>> #LightYellow
+}
+
+package "Selection" #FFF8E1 {
+  class Entretien <<concept>>
+  class AvisEquipe <<concept>>
+  class EvaluationRecruteur <<concept>>
+  class Alerte <<concept>>
+}
+
+package "Evaluation" #F3E5F5 {
+  class QuizPreselection <<concept>>
+  class QuestionQuiz <<concept>>
+  class ResultatQuiz <<concept>>
+  class AnalyseIAProfil <<concept>>
+}
+
+package "Plateforme" #ECEFF1 {
+  class MessageContact <<concept>>
+  class TraceActivite <<concept>>
+}
+
+enum StatutSociete {
+  En_attente
+  Validee
+  Refusee
+}
+enum StatutOffre {
+  Brouillon
+  Publiee
+  Fermee
+}
+enum StatutCandidature {
+  Recue
+  En_analyse
+  Entretien
+  Retenue
+  Refusee
+  Offre_envoyee
+}
+enum RoleCollaborateur {
+  Admin_plateforme
+  Admin_societe
+  Recruteur
+}
+
+' =============================================================================
+' 1. ORGANISATION DU CLIENT
+' =============================================================================
+Societe "1" *-- "1..*" Departement : <<compose>>\norganise
+Societe "0..1" o-- "0..*" Collaborateur : <<agrege>>\nemploie\n(admin plateforme : 0 societe)
+Departement "1" o-- "0..*" Collaborateur : <<agrege>>\nrepartit dans
+
+' =============================================================================
+' 2. COEUR RECRUTEMENT
+' Option B : pas de lien direct Societe - Candidat
+' Rattachement societe : Candidat → Candidature → OffreEmploi → Societe
+' =============================================================================
+Societe "1" *-- "0..*" OffreEmploi : <<compose>>\npublication des besoins
+
+Collaborateur "1" o-- "0..*" OffreEmploi : <<agrege>>\ncree / pilote
+
+Candidat "1" o-- "0..*" Candidature : <<agrege>>\ndepose
+OffreEmploi "1" o-- "0..*" Candidature : <<agrege>>\nrecoit les depots
+Candidature "0..*" --> "1" OffreEmploi : concerne\n(une offre)
+Candidature "0..*" --> "1" Candidat : emise par\n(un candidat)
+OffreEmploi "0..*" --> "1" Societe : publiee par\n(une societe)
+Collaborateur "0..1" o-- "0..*" Candidature : <<agrege>>\ninstruit / revoit
+
+' =============================================================================
+' 3. ACTIVITES SUR UNE CANDIDATURE
+' =============================================================================
+Candidature "1" o-- "0..*" Entretien : planifie
+Candidature "1" o-- "0..*" AvisEquipe : recoit
+Candidature "1" o-- "0..*" EvaluationRecruteur : recoit
+Candidature "1" o-- "0..*" Alerte : declenche
+
+Collaborateur "1" o-- "0..*" Entretien : anime
+Collaborateur "1" o-- "0..*" AvisEquipe : redige
+Collaborateur "1" o-- "0..*" EvaluationRecruteur : attribue
+
+AvisEquipe "0..1" o-- "0..*" AvisEquipe : <<agrege>>\nrepond a\n(fil discussion)
+
+' =============================================================================
+' 4. EVALUATION (quiz & IA)
+' =============================================================================
+OffreEmploi "1" o-- "0..*" QuizPreselection : peut avoir
+QuizPreselection "1" *-- "1..*" QuestionQuiz : <<compose>>\ncompose de
+
+Candidature "1" o-- "0..*" ResultatQuiz : obtient
+QuizPreselection "1" o-- "0..*" ResultatQuiz : evalue via
+ResultatQuiz "0..*" --> "1" Candidature : pour
+ResultatQuiz "0..*" --> "1" QuizPreselection : du
+
+Candidature "1" *-- "0..1" AnalyseIAProfil : <<compose>>\nderivee du depot CV
+
+' =============================================================================
+' 5. PLATEFORME (transversal)
+' =============================================================================
+TraceActivite ..> Societe : audite
+TraceActivite ..> Collaborateur : auteur
+TraceActivite ..> OffreEmploi : audite
+TraceActivite ..> Candidature : audite
+
+MessageContact ..> Collaborateur : traite par\n(admin plateforme)
+MessageContact ..> Societe : peut concerner\n(prospect client, 0..1)
+
+' =============================================================================
+' 6. TYPAGE METIER
+' =============================================================================
+Societe ..> StatutSociete : statut
+OffreEmploi ..> StatutOffre : statut
+Candidature ..> StatutCandidature : etape pipeline
+Collaborateur ..> RoleCollaborateur : role
+
+' =============================================================================
+' NOTES & LEGENDE
+' =============================================================================
+
+note top of Candidature
+  **Hub relationnel**
+  Chaque candidature lie exactement :
+  - 1 Candidat
+  - 1 Offre d'emploi (donc 1 Societe)
+  - 0..1 Recruteur referent
+  Puis : entretiens, avis, quiz, IA.
+end note
+
+note right of Candidat
+  Pas de lien direct vers Societe.
+  Un meme candidat peut postuler
+  chez plusieurs societes (chemins distincts
+  via des candidatures differentes).
+  Evolutif : CVtheque, marketplace RH.
+end note
+
+note bottom of Societe
+  Multi-client : chaque societe isole
+  ses offres et collaborateurs.
+  Les candidats sont rattaches via
+  Candidature → Offre → Societe.
+end note
+
+note bottom of MessageContact
+  Formulaire public (contact / demo).
+  Relie au processus commercial
+  et a l'admin plateforme.
+end note
+
+legend right
+  **Types de liens UML 2.5.1**
+  |= Symbole |= Signification metier |
+  | *-- | Composition : ne existe pas sans le parent |
+  | o-- | Agregation : vie propre possible |
+  | --> | Association nommee |
+  | ..> | Dependance / audit / traitement |
+  --
+  **Chemin Societe - Candidat (option B)**
+  Candidat → Candidature → OffreEmploi → Societe
+  (pas de lien direct Societe-Candidat)
+  --
+  **Relations cles**
+  | Candidat → Candidature | o-- agregation |
+  | Candidature → AnalyseIAProfil | *-- composition |
+  | Candidature → Entretien | 1 planifie 0..* |
+  | TraceActivite | audit transversal |
+endlegend
+
+@enduml

@@ -4,7 +4,7 @@ const { Client } = require('pg');
 const client = new Client({
   host: 'localhost',
   port: 5433,
-  database: 'novahiredb',
+  database: 'novahiredb2',
   user: 'postgres',
   password: 'root',
 });

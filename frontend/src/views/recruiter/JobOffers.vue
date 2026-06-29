@@ -86,7 +86,7 @@
                 <th>{{ $t('offers.table.location') }}</th>
                 <th>{{ $t('offers.table.contract') }}</th>
                 <th>{{ $t('offers.table.candidates') }}</th>
-                <th>{{ $t('offers.table.date') }}</th>
+                <th>Date de clôture</th>
                 <th>{{ $t('offers.table.status') }}</th>
                 <th style="text-align: right;">{{ $t('offers.table.actions') }}</th>
               </tr>
@@ -117,7 +117,12 @@
                     </div>
                   </div>
                 </td>
-                <td><span class="glass-meta">{{ offer.date }}</span></td>
+                <td>
+                  <span class="glass-meta" :class="{ 'deadline-soon': offer.deadlineSoon, 'deadline-passed': offer.deadlinePassed }">
+                    <span v-if="offer.deadline">{{ offer.deadline }}</span>
+                    <span v-else style="color: var(--r-text-sub); font-style: italic;">Non définie</span>
+                  </span>
+                </td>
                 <td>
                   <div class="status-pill-glowing" :class="offer.status">
                     <span class="pulse-dot"></span>
@@ -327,10 +332,31 @@ export default {
     async fetchOffers() {
       this.isLoading = true
       try {
-        const res = await api.get('/JobOffer')
+        const res = await api.get('/JobOffer', { params: { page: 1, limit: 200 } })
         // Gérer la nouvelle structure paginée: res.data = { data: [...], total, page, limit }
-        const data = res.data.data || []
-        this.totalOffers = res.data.total || data.length
+        const rawData = res.data.data || []
+        this.totalOffers = res.data.total || rawData.length
+
+        // Dédupliquer par ID puis par clé composite (titre+lieu+département)
+        // pour masquer les doublons existants en base de données
+        const seenIds = new Set()
+        const seenKeys = new Map()
+        const data = rawData
+          .filter(o => o?.id && !seenIds.has(o.id) && seenIds.add(o.id))
+          .filter(o => {
+            const key = `${(o.title || '').toLowerCase().trim()}|${(o.location || '').toLowerCase().trim()}|${(o.department || '').toLowerCase().trim()}`
+            if (seenKeys.has(key)) {
+              // Garder uniquement si plus de candidats que le doublon existant
+              const existing = seenKeys.get(key)
+              if ((o.applicationsCount || 0) > (existing.applicationsCount || 0)) {
+                seenKeys.set(key, o)
+                return true
+              }
+              return false
+            }
+            seenKeys.set(key, o)
+            return true
+          })
         
         this.offers = data.map(o => {
           // Normalize status
@@ -347,6 +373,9 @@ export default {
             type: o.type || 'FullTime',
             applications: o.applicationsCount || 0,
             date: o.createdAt ? new Date(o.createdAt).toLocaleDateString('fr-FR') : '—',
+            deadline: o.deadline ? new Date(o.deadline).toLocaleDateString('fr-FR') : null,
+            deadlineSoon: o.deadline ? (new Date(o.deadline) - new Date()) < 7 * 24 * 60 * 60 * 1000 && new Date(o.deadline) > new Date() : false,
+            deadlinePassed: o.deadline ? new Date(o.deadline) < new Date() : false,
             status: status,
             statusLabel: this.getStatusLabel(status),
             shareToken: o.shareToken
@@ -668,5 +697,16 @@ export default {
   .filter-card { flex-direction: column; align-items: stretch; gap: 16px; }
   .filter-group { margin: 0; justify-content: space-between; }
   .r-search { max-width: none; }
+}
+
+/* Deadline indicators */
+.deadline-soon {
+  color: #f59e0b !important;
+  font-weight: 700 !important;
+}
+.deadline-passed {
+  color: #ef4444 !important;
+  font-weight: 700 !important;
+  text-decoration: line-through;
 }
 </style>

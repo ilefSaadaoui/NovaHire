@@ -123,7 +123,7 @@
 
         <!-- BLOC 2 : ANALYSE STRATÉGIQUE -->
         <div class="dashboard-main-grid stagger-reveal">
-          <div class="supervision-row">
+          <div class="supervision-row" style="grid-template-columns: 1fr;">
             <!-- FUNNEL DE CONVERSION -->
             <div class="admin-glass-card anim-reveal-up" style="animation-delay: 0.4s">
                <div class="gov-card-header">
@@ -139,20 +139,6 @@
                <div class="pulse-note mt-16">
                   <Zap :size="14" style="color: #f59e0b; flex-shrink: 0;" />
                   <span>Votre taux de conversion final est de {{ Math.round(govData.funnelData.hired / govData.funnelData.applications * 100) }}%. C'est 12% de plus que le mois dernier.</span>
-               </div>
-            </div>
-
-            <!-- ORIGINE DES TALENTS -->
-            <div class="admin-glass-card anim-reveal-up" style="animation-delay: 0.5s">
-               <div class="gov-card-header">
-                  <h3 class="r-card-title">Origine des Talents (Sourcing)</h3>
-               </div>
-               <div class="sourcing-wrapper">
-                 <SourcingDonut :data="govData.sourcingData" />
-               </div>
-               <div class="health-summary-note mt-10">
-                 <Sparkles :size="14" style="color: var(--primary); flex-shrink: 0;" />
-                 <span>LinkedIn reste votre canal #1, générant 45% de vos recrues.</span>
                </div>
             </div>
           </div>
@@ -228,12 +214,6 @@
         </div>
       </div>
     </main>
-    
-    <DailyBriefingModal
-      :show="showBriefing"
-      @close="showBriefing = false"
-      @navigate="handleBriefingNavigate"
-    />
   </div>
 </template>
 
@@ -246,15 +226,14 @@ import Sidebar from '@/components/layout/Sidebar.vue'
 import Sparkline from '@/components/common/Sparkline.vue'
 import MainPerformanceChart from '@/components/common/MainPerformanceChart.vue'
 import ConversionFunnel from '@/components/common/ConversionFunnel.vue'
-import SourcingDonut from '@/components/common/SourcingDonut.vue'
 import { 
   LayoutDashboard, Briefcase, Users, Timer, 
-  Sparkles, TrendingUp, Zap, ChevronRight,
+  TrendingUp, Zap, ChevronRight,
   UserPlus, UserCheck, Clock, Activity, ChevronDown, AlertTriangle,
   BarChart3, Heart, FileText, Plus, Pencil, User, Palette, FileSearch,
   Layers, Settings
 } from 'lucide-vue-next'
-import DailyBriefingModal from '@/components/superadmin/modals/DailyBriefingModal.vue'
+
 
 // STORES & ROUTER
 const authStore = useAuthStore()
@@ -263,7 +242,6 @@ const router = useRouter()
 
 // STATE
 const sidebarCollapsed = ref(false)
-const showBriefing = ref(false)
 
 // LIFECYCLE
 onMounted(async () => {
@@ -273,20 +251,7 @@ onMounted(async () => {
     companyStore.fetchDepartments(),
     companyStore.fetchBranding()
   ])
-
-  // Show briefing if first time in session
-  if (!sessionStorage.getItem('briefing_shown')) {
-    setTimeout(() => {
-      showBriefing.value = true
-      sessionStorage.setItem('briefing_shown', 'true')
-    }, 1200)
-  }
 })
-
-const handleBriefingNavigate = (target) => {
-  if (target === 'dashboard') return
-  // Logic for specific navigation if needed
-}
 
 // COMPUTED
 const loading = computed(() => companyStore.loading)
@@ -405,13 +370,6 @@ const govData = computed(() => {
       offers: 45,
       hired: 18
     },
-    sourcingData: (s.sourcingData && Object.keys(s.sourcingData).length > 0) ? s.sourcingData : {
-      'LinkedIn': 45,
-      'Indeed': 25,
-      'Candidatures Directes': 15,
-      'Cooptation': 10,
-      'Autres': 5
-    },
     teamSupervision,
     platformHealth: {
       statusLabel: healthLabels[healthStatus],
@@ -529,11 +487,15 @@ defineOptions({ name: 'AdminDashboard' })
 }
 
 /* CELESTIAL BACKGROUND ORBS */
+.celestial-bg,
+.celestial-bg * {
+  pointer-events: none !important;
+}
 .celestial-bg {
-  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity 0.8s;
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; opacity: 0; transition: opacity 0.8s;
 }
 .dark-mode .celestial-bg { opacity: 1; }
-.c-orb { position: absolute; border-radius: 50%; filter: blur(120px); animation: floatOrb 20s ease-in-out infinite alternate; pointer-events: none; }
+.c-orb { position: absolute; border-radius: 50%; filter: blur(120px); animation: floatOrb 20s ease-in-out infinite alternate; }
 .orb-1 { width: 500px; height: 500px; background: #0ea5e9; top: -100px; left: -100px; opacity: 0.12; }
 .orb-2 { width: 450px; height: 450px; background: #6366f1; bottom: 50px; right: -50px; animation-delay: -7s; opacity: 0.1; }
 .orb-3 { width: 350px; height: 350px; background: #8b5cf6; top: 30%; left: 40%; animation-delay: -14s; opacity: 0.08; }

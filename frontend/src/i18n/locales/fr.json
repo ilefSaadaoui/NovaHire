@@ -1,4 +1,4 @@
-﻿{
+{
     "common": {
         "dashboard": "Tableau de bord",
         "offers": "Offres",
@@ -241,8 +241,9 @@
         },
         "types": {
             "fullTime": "CDI (Plein temps)",
-            "contract": "CDD / Intérim",
-            "internship": "Stage / Alternance",
+            "contract": "CDD",
+            "internship": "Stage",
+            "partTime": "Temps Partiel",
             "freelance": "Freelance / Indépendant"
         },
         "experience": {
@@ -429,6 +430,13 @@
                 "office": "Sur site",
                 "hybrid": "Hybride",
                 "remote": "Total"
+            },
+            "types": {
+                "cdi": "CDI (Contrat à Durée Indéterminée)",
+                "cdd": "CDD (Contrat à Durée Déterminée)",
+                "freelance": "Freelance / Indépendant",
+                "stage": "Stage Conventionné",
+                "partTime": "Temps Partiel"
             }
         },
         "profile": {

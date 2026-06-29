@@ -62,7 +62,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ArrowLeft, Eye, Calendar, Sparkles, Loader2, FileText, Briefcase, MapPin } from 'lucide-vue-next'
+import { ArrowLeft, Eye, Calendar, Sparkles, Loader2, FileText, Briefcase, MapPin, Zap } from 'lucide-vue-next'
 
 const props = defineProps({
   candidate: Object,

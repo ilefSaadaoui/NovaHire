@@ -85,6 +85,16 @@ const isCaLight = computed(() => {
   background: #020617; /* Base OLED Black */
 }
 
+/* Force pointer-events none on the background container and all descendants in all states */
+.celestial-bg-system,
+.celestial-bg-system *,
+.ca-light-elite,
+.ca-light-elite *,
+:global(.dark-mode) .celestial-bg-system,
+:global(.dark-mode) .celestial-bg-system * {
+  pointer-events: none !important;
+}
+
 .nebula-cloud {
   position: absolute;
   width: 600px;

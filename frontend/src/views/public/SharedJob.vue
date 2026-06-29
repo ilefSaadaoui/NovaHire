@@ -31,8 +31,14 @@
       </div>
     </header>
 
+    <!-- Loading State -->
+    <div v-if="isLoading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Chargement de l'offre en cours...</p>
+    </div>
+
     <!-- Main Layout -->
-    <div class="page-layout" v-if="offer">
+    <div class="page-layout" v-else-if="offer">
       <!-- LEFT COLUMN -->
       <main class="content-col">
 
@@ -146,57 +152,21 @@
                       <span class="file-drop-text">
                         {{ uploadedDocs['cv'] ? uploadedDocs['cv'].name : 'Déposer ou cliquer pour importer' }}
                       </span>
-                      <span class="file-drop-hint" v-if="!uploadedDocs['cv']">PDF / DOCX</span>
+                      <span class="file-drop-hint" v-if="!uploadedDocs['cv']">PDF / DOC / DOCX</span>
                     </label>
                   </div>
-
-                  <!-- CV Parsing Preview -->
-                  <div v-if="isParsing" class="cv-preview-loading">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" class="spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-                    <span>Analyse IA de votre CV en cours…</span>
-                  </div>
-
-                  <div v-if="cvPreview" class="cv-preview-card anim-reveal-up">
-                    <div class="cv-preview-header-luxury">
-                      <div class="ia-badge-luxe">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                        <span>Intelligence Artificielle</span>
-                      </div>
-                      <div class="header-main-text">Extraction réussie !</div>
-                    </div>
-                    
-                    <div class="cv-preview-body">
-                      <p class="preview-intro">Nous avons analysé votre CV et pré-rempli les champs ci-dessus. Veuillez vérifier l'exactitude des informations.</p>
-                      
-                      <div class="extracted-stats">
-                        <div class="stat-item">
-                          <span class="stat-value">{{ cvPreview.skills?.length || 0 }}</span>
-                          <span class="stat-label">Compétences</span>
-                        </div>
-                        <div class="stat-item">
-                          <span class="stat-value">{{ cvPreview.workExperiences?.length || 0 }}</span>
-                          <span class="stat-label">Expériences</span>
-                        </div>
-                        <div class="stat-item">
-                          <span class="stat-value">{{ cvPreview.languages?.length || 0 }}</span>
-                          <span class="stat-label">Langues</span>
-                        </div>
-                      </div>
-
-                      <div v-if="cvPreview.skills && cvPreview.skills.length" class="cv-preview-section">
-                        <strong>Compétences clés identifiées</strong>
-                        <div class="cv-skills-cloud">
-                          <span v-for="s in cvPreview.skills.slice(0, 8)" :key="s" class="cv-skill-chip">{{ s }}</span>
-                          <span v-if="cvPreview.skills.length > 8" class="cv-skill-more">+{{ cvPreview.skills.length - 8 }}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="cv-preview-footer-success">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="12"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                      <span>Données synchronisées avec le formulaire</span>
-                    </div>
-                  </div>
                 </div>
+
+                 <!-- Consent Checkbox (RGPD & Loi Tunisienne n° 2004-63) -->
+                 <div class="field-group consent-group">
+                   <label class="custom-consent-check">
+                     <input type="checkbox" v-model="agreeToPrivacy" required />
+                     <span class="custom-check-box"></span>
+                     <span class="consent-text">
+                       J'accepte le traitement de mes données conformément à la <a href="#" @click.prevent="showPrivacyModal = true" class="legal-link" :style="{ color: offer?.pageColor || '#3b82f6' }">Charte de Protection des Données</a> (RGPD &amp; Loi Tunisienne n° 2004-63).
+                     </span>
+                   </label>
+                 </div>
               </div>
 
               <div class="form-footer">
@@ -221,21 +191,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="32"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <h3 class="success-title">Candidature envoyée !</h3>
-            <p class="success-msg">Votre dossier a bien été transmis à l'équipe de recrutement. Vous serez contacté prochainement.</p>
-            
-            <div v-if="offer?.hasQuiz" class="quiz-invitation-box anim-reveal-up">
-              <div class="quiz-icon-celestial">
-                <i class="fas fa-brain"></i>
-              </div>
-              <div class="quiz-invitation-text">
-                <h4>Évaluation IA disponible</h4>
-                <p>Boostez votre candidature en passant dès maintenant le test technique ({{ offer.quizTimeLimit }} min).</p>
-              </div>
-              <button @click="goToQuiz" class="btn-start-quiz-now">
-                Passer le test
-                <i class="fas fa-arrow-right"></i>
-              </button>
-            </div>
+            <p class="success-msg">Votre dossier a bien été transmis à l'équipe de recrutement. Un e-mail de confirmation a été envoyé à l'adresse indiquée dans le formulaire.</p>
 
             <button @click="applicationSent = false" class="btn-reset">Modifier ma candidature</button>
           </div>
@@ -252,6 +208,55 @@
       <p>Cette offre n'est plus disponible ou le lien a expiré.</p>
       <router-link to="/" class="btn-reset">Retour à l'accueil</router-link>
     </div>
+
+    <!-- CANDIDATE PRIVACY MODAL -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showPrivacyModal" class="privacy-overlay" @click="showPrivacyModal = false">
+          <div class="privacy-modal" @click.stop>
+            <div class="privacy-header">
+              <div class="privacy-header-left">
+                <div class="privacy-icon-box" :style="{ color: offer?.pageColor || '#3b82f6', background: (offer?.pageColor || '#3b82f6') + '15' }">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:22px;height:22px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <div>
+                  <h3 class="privacy-modal-title">Charte de Protection des Données</h3>
+                  <p class="privacy-modal-subtitle">Conformité RGPD et Loi Tunisienne n° 2004-63</p>
+                </div>
+              </div>
+              <button class="privacy-close-btn" @click="showPrivacyModal = false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <div class="privacy-body">
+              <h4>1. Collecte et finalité du traitement</h4>
+              <p>Dans le cadre du processus de recrutement pour l'offre d'emploi <strong>{{ offer?.title }}</strong> publiée par <strong>{{ offer?.company }}</strong>, les données personnelles que vous renseignez dans ce formulaire (nom, prénom, e-mail, téléphone, profils professionnels, lettre de motivation et CV) sont collectées et traitées uniquement dans le but d'analyser et d'évaluer l'adéquation de votre candidature.</p>
+              
+              <h4>2. Traitement automatique et utilisation de l'IA</h4>
+              <p>Le contenu de votre CV et de vos réponses peut faire l'objet d'une analyse automatisée et d'un scoring par des algorithmes d'Intelligence Artificielle (IA) intégrés à la plateforme NovaHire afin d'extraire vos compétences clés et de synthétiser vos expériences de manière objective pour l'équipe de recrutement.</p>
+              
+              <h4>3. Cadre réglementaire et base légale</h4>
+              <p>Ce traitement repose sur votre consentement explicite et est mené en conformité avec :</p>
+              <ul>
+                <li>Le <strong>Règlement Général sur la Protection des Données (RGPD)</strong> de l'Union Européenne.</li>
+                <li>La <strong>loi organique tunisienne n° 2004-63 du 27 juillet 2004</strong> portant sur la protection des données à caractère personnel.</li>
+              </ul>
+              
+              <h4>4. Destinataires et conservation des données</h4>
+              <p>Vos données sont confidentielles et accessibles uniquement par l'équipe de recrutement de <strong>{{ offer?.company }}</strong> et les administrateurs système de NovaHire. Elles ne seront jamais revendues ou divulguées à des tiers. Vos données personnelles sont conservées pour une durée n'excédant pas celle nécessaire aux finalités pour lesquelles elles sont collectées.</p>
+
+              <h4>5. Vos droits (Accès, Rectification, Suppression)</h4>
+              <p>Conformément aux réglementations en vigueur, vous disposez d'un droit d'accès, de rectification, d'opposition, de limitation du traitement et d'effacement (droit à l'oubli) de vos données personnelles. Pour exercer ces droits ou pour toute question relative à l'utilisation de vos données, vous pouvez contacter directement l'entreprise ou les administrateurs de la plateforme NovaHire.</p>
+            </div>
+
+            <div class="privacy-footer">
+              <button class="privacy-btn-accept" :style="{ background: offer?.pageColor || '#3b82f6' }" @click="acceptPrivacyFromModal">J'ai lu et j'accepte</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -264,7 +269,10 @@ export default {
   data() {
     return {
       logoUrl,
+      isLoading: true,
       offer: null,
+      agreeToPrivacy: false,
+      showPrivacyModal: false,
       form: {
         firstName: '',
         lastName: '',
@@ -276,10 +284,7 @@ export default {
       },
       uploadedDocs: {},
       isSubmitting: false,
-      isParsing: false,
-      cvPreview: null,
       applicationSent: false,
-      applicationId: null,
       source: null
     }
   },
@@ -336,12 +341,13 @@ export default {
       if (!val) return '—'
       const maps = {
         remote: { OnSite: 'Sur site', Remote: 'Télétravail', Hybrid: 'Hybride', office: 'Sur site', hybrid: 'Hybride', remote: 'Télétravail' },
-        type: { FullTime: 'CDI', Contract: 'CDD', Freelance: 'Freelance', Internship: 'Stage', fulltime: 'CDI', contract: 'CDD', freelance: 'Freelance', internship: 'Stage' }
+        type: { FullTime: 'CDI', Contract: 'CDD', Freelance: 'Freelance', Internship: 'Stage', PartTime: 'Temps Partiel', fulltime: 'CDI', contract: 'CDD', freelance: 'Freelance', internship: 'Stage', parttime: 'Temps Partiel' }
       }
       return maps[type]?.[val] || maps[type]?.[val?.toLowerCase()] || val
     },
     async loadOffer() {
       const token = this.$route.params.token
+      this.isLoading = true
       try {
         // silentError: true → supprime toast + console.error pour les 404 attendues
         const res = await api.get(`/public/offers/${token}`, { silentError: true })
@@ -354,6 +360,8 @@ export default {
           console.error('Erreur chargement offre:', err)
         }
         this.offer = null
+      } finally {
+        this.isLoading = false
       }
     },
     mapInputType(type) {
@@ -379,38 +387,15 @@ export default {
     onDocChange(event, docId) {
       this.uploadedDocs[docId] = event.target.files[0]
     },
-    async onCVChange(event) {
+    onCVChange(event) {
       const file = event.target.files[0]
-      if (!file) return
-      this.uploadedDocs['cv'] = file
-      this.cvPreview = null
-
-      // Auto-parse for transparency
-      this.isParsing = true
-      try {
-        const formData = new FormData()
-        formData.append('file', file)
-        const res = await api.post('/public/parse-cv', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          silentError: true
-        })
-        this.cvPreview = res.data
-
-        // Pre-fill form fields if they are empty
-        if (res.data.firstName && !this.form.firstName) this.form.firstName = res.data.firstName
-        if (res.data.lastName && !this.form.lastName) this.form.lastName = res.data.lastName
-        if (res.data.email && !this.form.email) this.form.email = res.data.email
-        if (res.data.phone && !this.form.phone) this.form.phone = res.data.phone
-
-      } catch (err) {
-        // Parsing is optional — if it fails, candidate can still submit
-        console.warn('CV preview parsing failed:', err)
-        this.cvPreview = null
-      } finally {
-        this.isParsing = false
-      }
+      if (file) this.uploadedDocs['cv'] = file
     },
     async submitApplication() {
+      if (!this.agreeToPrivacy) {
+        alert("Vous devez accepter les conditions relatives à la protection de vos données personnelles pour continuer.");
+        return;
+      }
       this.isSubmitting = true
       try {
         const formData = new FormData()
@@ -419,10 +404,9 @@ export default {
         if (this.uploadedDocs.cv) formData.append('CVFile', this.uploadedDocs.cv)
         if (this.source) formData.append('source', this.source)
 
-        const res = await api.post('/public/applications', formData, {
+        await api.post('/public/applications', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
-        this.applicationId = res.data.id
         this.applicationSent = true
       } catch (err) {
         console.error('Erreur soumission:', err)
@@ -431,13 +415,9 @@ export default {
         this.isSubmitting = false
       }
     },
-    goToQuiz() {
-      if (!this.offer?.shareToken) return
-      this.$router.push({
-        name: 'PublicQuiz',
-        params: { token: this.offer.shareToken },
-        query: { appId: this.applicationId }
-      })
+    acceptPrivacyFromModal() {
+      this.agreeToPrivacy = true;
+      this.showPrivacyModal = false;
     }
   }
 }
@@ -977,166 +957,6 @@ export default {
   flex-shrink: 0;
 }
 
-/* ─── CV Preview ─── */
-.cv-preview-loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #eff6ff 0%, #faf5ff 100%);
-  border: 1px solid #e0e7ff;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #6366f1;
-  margin-top: 10px;
-}
-
-.cv-preview-card {
-  margin-top: 10px;
-  background: #fff;
-  border: 1px solid #e0e7ff;
-  border-radius: 12px;
-  overflow: hidden;
-  animation: cvReveal 0.4s ease-out;
-}
-
-@keyframes cvReveal {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.cv-preview-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: white;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.cv-preview-card {
-  margin-top: 16px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-}
-
-.cv-preview-header-luxury {
-  padding: 14px 16px;
-  background: #f8fafc;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.ia-badge-luxe {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-  color: white;
-  border-radius: 100px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 8px;
-}
-
-.header-main-text {
-  font-family: 'Sora', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.cv-preview-body {
-  padding: 16px;
-}
-
-.preview-intro {
-  font-size: 12px;
-  color: #64748b;
-  line-height: 1.5;
-  margin-bottom: 16px;
-}
-
-.extracted-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px;
-  background: #f1f5f9;
-  border-radius: 12px;
-}
-
-.stat-value {
-  font-family: 'Sora', sans-serif;
-  font-size: 16px;
-  font-weight: 800;
-  color: #3b82f6;
-}
-
-.stat-label {
-  font-size: 9px;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-}
-
-.cv-preview-section strong {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  color: #475569;
-  margin-bottom: 8px;
-}
-
-.cv-skills-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.cv-skill-chip {
-  padding: 4px 10px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.cv-skill-more {
-  font-size: 11px;
-  font-weight: 700;
-  color: #94a3b8;
-  align-self: center;
-}
-
-.cv-preview-footer-success {
-  padding: 10px 16px;
-  background: #f0fdf4;
-  border-top: 1px solid #dcfce7;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #15803d;
-  font-size: 11px;
-  font-weight: 700;
-}
-
 /* Form Footer */
 .form-footer {
   margin-top: 20px;
@@ -1234,75 +1054,6 @@ export default {
   margin-bottom: 24px;
 }
 
-/* Quiz Invitation Box */
-.quiz-invitation-box {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%);
-  border: 1px solid rgba(14, 165, 233, 0.2);
-  border-radius: 16px;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-  text-align: left;
-  animation: revealUp 0.6s cubic-bezier(0.2, 0, 0.2, 1) both;
-}
-
-.quiz-icon-celestial {
-  width: 48px;
-  height: 48px;
-  background: #0ea5e9;
-  color: white;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
-}
-
-.quiz-invitation-text h4 {
-  font-family: 'Sora', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 4px;
-}
-
-.quiz-invitation-text p {
-  font-size: 13px;
-  color: #64748b;
-  margin: 0;
-  line-height: 1.4;
-}
-
-.btn-start-quiz-now {
-  margin-left: auto;
-  padding: 10px 20px;
-  background: #111827;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: 0.3s;
-}
-
-.btn-start-quiz-now:hover {
-  background: #000;
-  transform: translateX(4px);
-}
-
-@keyframes revealUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 .btn-reset {
   display: inline-block;
   margin-top: 8px;
@@ -1366,6 +1117,39 @@ export default {
   line-height: 1.6;
 }
 
+/* ─── Loading State ─── */
+.loading-state {
+  max-width: 400px;
+  margin: 100px auto;
+  text-align: center;
+  padding: 48px 40px;
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.loading-state p {
+  font-family: 'Sora', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top-color: var(--accent, #3b82f6);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 1024px) {
   .page-layout {
@@ -1417,5 +1201,262 @@ export default {
   .nh-logo {
     display: none;
   }
+}
+
+/* Consent Checkbox styling */
+.consent-group {
+  margin-top: 10px;
+}
+
+.custom-consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.4;
+  user-select: none;
+}
+
+.custom-consent-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.custom-check-box {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 4px;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 1px;
+  background: #fff;
+}
+
+.custom-consent-check:hover .custom-check-box {
+  border-color: var(--accent, #3b82f6);
+}
+
+.custom-consent-check input:checked + .custom-check-box {
+  background: var(--accent, #3b82f6);
+  border-color: var(--accent, #3b82f6);
+}
+
+.custom-consent-check input:checked + .custom-check-box::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-weight: 800;
+  font-size: 11px;
+}
+
+.consent-text {
+  font-weight: 500;
+}
+
+/* Privacy Modal CSS for Candidate Portal */
+.privacy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: auto !important;
+}
+
+.privacy-overlay * {
+  pointer-events: auto !important;
+}
+
+.privacy-modal {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 620px;
+  overflow: hidden;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.privacy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fafafa;
+}
+
+.privacy-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.privacy-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.privacy-modal-title {
+  font-family: 'Sora', sans-serif;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.privacy-modal-subtitle {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.privacy-close-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.privacy-close-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.privacy-body {
+  padding: 24px;
+  overflow-y: auto;
+  color: #4b5563;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* Custom Scrollbar for Privacy Body */
+.privacy-body::-webkit-scrollbar {
+  width: 6px;
+}
+.privacy-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 10px;
+}
+.privacy-body::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.35);
+  border-radius: 10px;
+}
+.privacy-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
+
+.privacy-body h4 {
+  font-family: 'Sora', sans-serif;
+  color: #111827;
+  margin-top: 18px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.privacy-body h4:first-of-type {
+  margin-top: 0;
+}
+
+.privacy-body p {
+  margin: 0 0 12px 0;
+}
+
+.privacy-body ul {
+  margin: 0 0 12px 0;
+  padding-left: 20px;
+}
+
+.privacy-body li {
+  margin-bottom: 4px;
+}
+
+.privacy-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: flex-end;
+  background: #fafafa;
+}
+
+.privacy-btn-accept {
+  padding: 11px 22px;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Sora', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+
+.privacy-btn-accept:hover {
+  filter: brightness(1.08);
+}
+
+.legal-link {
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.2s ease;
+}
+
+.legal-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+/* Modal Transition */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-active .privacy-modal,
+.modal-fade-leave-active .privacy-modal {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-fade-enter-from .privacy-modal,
+.modal-fade-leave-to .privacy-modal {
+  transform: scale(0.9) translateY(10px);
 }
 </style>

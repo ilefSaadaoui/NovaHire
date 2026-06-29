@@ -150,7 +150,8 @@ const form = ref({
   status: 'Published',
   weightExperience: 33,
   weightEducation: 33,
-  weightSkills: 34
+  weightSkills: 34,
+  autoRejectThreshold: 0
 })
 
 const formFields = ref([
@@ -160,7 +161,7 @@ const formFields = ref([
   { id: 'resume', name: 'Curriculum Vitae (CV)', desc: 'Document PDF ou Word', enabled: true, required: true, canDisable: true },
   { id: 'coverLetter', name: 'Lettre de motivation', desc: 'Argumentation du candidat', enabled: true, required: false, canDisable: true },
   { id: 'linkedin', name: 'Profil LinkedIn', desc: 'Lien vers le réseau social', enabled: true, required: false, canDisable: true },
-  { id: 'portfolio', name: 'Portfolio / Site web', desc: 'Lien vers les réalisations', enabled: false, required: false, canDisable: true }
+  { id: 'portfolio', name: 'Portfolio / Site web', desc: 'Lien vers les réalisations', enabled: true, required: false, canDisable: true }
 ])
 
 const errors = ref({
@@ -286,24 +287,16 @@ const typeOptions = [
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
   },
   { 
+    value: 'PartTime', label: 'Temps Partiel',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+  },
+  { 
     value: 'Internship', label: 'Stage Conventionné',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>'
   },
   { 
-    value: 'Apprenticeship', label: 'Alternance / Apprentissage',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'
-  },
-  { 
     value: 'Freelance', label: 'Freelance / Indépendant',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
-  },
-  { 
-    value: 'Interim', label: 'Intérim / Mission ponctuelle',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
-  },
-  { 
-    value: 'Voluntary', label: 'VIE / Volontariat',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
   }
 ]
 
@@ -365,7 +358,8 @@ const fetchOffer = async () => {
       status: normalizeStatusForForm(data.status || data.visibility),
       weightExperience: data.weightExperience ?? 33,
       weightEducation: data.weightEducation ?? 33,
-      weightSkills: data.weightSkills ?? 34
+      weightSkills: data.weightSkills ?? 34,
+      autoRejectThreshold: data.autoRejectThreshold ?? 0
     }
     
     if (data.formConfig) {
@@ -472,6 +466,8 @@ const goToPrevStep = () => {
 }
 
 const publishOffer = async () => {
+  if (isLoading.value) return
+
   validateField('deadline')
   if (errors.value.deadline) {
     scrollToFirstError()
@@ -499,16 +495,12 @@ const publishOffer = async () => {
     else if (exp === 'expert') payload.experienceLevel = 'Expert'
     else payload.experienceLevel = 'Intermediate'
 
-    // Fallback unsupported types to Contract
-    const jt = payload.type
-    if (jt === 'Apprenticeship' || jt === 'Interim' || jt === 'Voluntary') {
-       payload.type = 'Contract' 
-    }
 
     if (payload.department === 'other') {
       payload.department = payload.otherDepartment || 'Autre'
     }
     delete payload.otherDepartment
+    delete payload.salaryCurrency
 
     payload.deadline = payload.deadline || null
     
@@ -520,6 +512,9 @@ const publishOffer = async () => {
     payload.weightExperience = parseInt(payload.weightExperience) || 0
     payload.weightEducation = parseInt(payload.weightEducation) || 0
     payload.weightSkills = parseInt(payload.weightSkills) || 0
+
+    const threshold = parseInt(payload.autoRejectThreshold)
+    payload.autoRejectThreshold = (!isNaN(threshold) && threshold > 0) ? threshold : 0
 
     const formConfig = {}
     formFields.value.forEach(f => {
@@ -533,7 +528,10 @@ const publishOffer = async () => {
       formConfig[key] = f.enabled
     })
     payload.FormConfig = formConfig
-    payload.visibility = payload.status 
+    
+    // Assign visibility before deleting payload.status
+    payload.visibility = payload.status
+    delete payload.status
     
     let response
     if (isEdit) {
@@ -554,6 +552,8 @@ const publishOffer = async () => {
     }
   } catch (err) {
     console.error('Erreur publication:', err)
+    const serverMessage = err.response?.data ? JSON.stringify(err.response.data) : err.message
+    alert("Détail de l'erreur serveur : " + serverMessage)
     toastStore.show('Erreur lors de la publication', 'error')
   } finally {
     isLoading.value = false
@@ -595,8 +595,8 @@ onMounted(() => {
 }
 
 .stepper-wrap-lux {
-  margin-bottom: 48px;
-  max-width: 900px;
+  margin-bottom: 16px;
+  max-width: 800px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -609,11 +609,11 @@ onMounted(() => {
 
 .form-main-container {
   width: 100%;
-  max-width: 900px;
+  max-width: 800px;
 }
 
 .form-inner-card-lux {
-  padding: 48px;
+  padding: 32px;
   background: var(--r-surface);
   border: 1px solid var(--r-border);
   border-radius: 40px;

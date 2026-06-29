@@ -144,19 +144,31 @@
          <div class="salary-header-lux">
             <div class="salary-label-group">
                <span class="main-label">Fourchette de salaire</span>
-               <span class="sub-label">Montant annuel brut en euros</span>
+               <span class="sub-label">Montant annuel brut et devise</span>
             </div>
             <div class="salary-range-display" v-if="form.salaryMin || form.salaryMax">
-               {{ form.salaryMin || '0' }}k - {{ form.salaryMax || '?' }}k €
+               {{ form.salaryMin || '0' }}k - {{ form.salaryMax || '?' }}k {{ form.salaryCurrency || '€' }}
             </div>
          </div>
 
-         <div class="salary-grid-lux">
+         <div class="salary-grid-lux-premium">
+            <div class="sal-input-group">
+               <label>Devise</label>
+               <select 
+                 :value="form.salaryCurrency || '€'" 
+                 @change="$emit('update:form', { ...form, salaryCurrency: $event.target.value })"
+                 class="currency-select-premium"
+               >
+                 <option value="€">EUR (€)</option>
+                 <option value="DT">TND (DT)</option>
+                 <option value="$">USD ($)</option>
+               </select>
+            </div>
             <div class="sal-input-group">
                <label>Minimum</label>
                <div class="sal-input-wrap">
                   <input type="number" :value="form.salaryMin" @input="$emit('update:form', { ...form, salaryMin: $event.target.value })" placeholder="Montant annuel min">
-                  <span class="cur">€</span>
+                  <span class="cur">{{ form.salaryCurrency || '€' }}</span>
                </div>
             </div>
             <div class="sal-sep-lux"><div class="dots"></div></div>
@@ -164,7 +176,7 @@
                <label>Maximum</label>
                <div class="sal-input-wrap">
                   <input type="number" :value="form.salaryMax" @input="$emit('update:form', { ...form, salaryMax: $event.target.value })" placeholder="Montant annuel max">
-                  <span class="cur">€</span>
+                  <span class="cur">{{ form.salaryCurrency || '€' }}</span>
                </div>
             </div>
          </div>
@@ -385,7 +397,14 @@ const execCommand = (command, value = null) => {
 .sub-label { font-size: 12px; color: var(--r-text-sub); font-weight: 600; }
 .salary-range-display { background: var(--accent-grad); color: white; padding: 8px 16px; border-radius: 12px; font-weight: 900; font-size: 14px; box-shadow: 0 5px 15px var(--accent-soft); }
 
-.salary-grid-lux { display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px; align-items: center; margin-bottom: 24px; }
+.salary-grid-lux-premium { display: grid; grid-template-columns: 140px 1fr auto 1fr; gap: 24px; align-items: center; margin-bottom: 24px; }
+.currency-select-premium {
+  width: 100%; padding: 16px; border-radius: 18px;
+  background: var(--bg-hover); border: 1.5px solid var(--r-border);
+  font-size: 16px; font-weight: 800; color: var(--r-text-main); transition: 0.3s;
+  outline: none; cursor: pointer;
+}
+.currency-select-premium:focus { border-color: var(--accent); background: var(--r-surface); }
 .sal-input-group label { font-size: 12px; font-weight: 800; color: var(--r-text-sub); text-transform: uppercase; margin-bottom: 10px; display: block; }
 .sal-input-wrap { position: relative; }
 .sal-input-wrap input {

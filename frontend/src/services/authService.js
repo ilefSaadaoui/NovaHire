@@ -3,10 +3,12 @@
  * Handles all API calls related to authentication
  */
 
+// Always use the relative /api path so requests go through the Vite dev proxy
+// (configured in vite.config.js → target: https://localhost:7075)
+// Using an absolute URL like http://localhost:5000 bypasses the proxy and causes CORS errors.
 const API_BASE_URL =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
-  (typeof process !== 'undefined' && process.env && process.env.VUE_APP_API_URL) ||
-  'http://localhost:5000/api'
+  '/api'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10000
 const REGISTER_COMPANY_TIMEOUT_MS = 60000
@@ -65,33 +67,6 @@ const readErrorMessage = async (response, fallbackMessage) => {
 
 const authService = {
   /**
-   * Register a new candidate
-   * @param {Object} candidateData - Candidate registration data
-   * @returns {Promise} Response from API
-   */
-  registerCandidate(candidateData) {
-    return fetchWithTimeout(`${API_BASE_URL}/auth/register/candidate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        firstName: candidateData.firstName,
-        lastName: candidateData.lastName,
-        email: candidateData.email,
-        phone: candidateData.phone || null,
-        password: candidateData.password,
-        userRole: 3 // Candidate role
-      })
-    }).then(response => {
-      if (!response.ok) {
-        throw new Error('Candidate registration failed')
-      }
-      return response.json()
-    })
-  },
-
-  /**
    * Register a new company and its admin
    * @param {Object} registrationData - Complete registration data
    * @returns {Promise} Response from API
@@ -138,28 +113,52 @@ const authService = {
    * @param {string} password - User password
    * @returns {Promise} Response from API with token and role
    */
-  login(email, password) {
-    return fetchWithTimeout(`${API_BASE_URL}/auth/login`, {
+  async login(email, password, rememberMe = false) {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email, password })
-    }).then(response => {
-      if (!response.ok) {
-        throw new Error('Identifiants invalides')
-      }
-      return response.json()
-    }).then(data => {
-      const token = data.token || data.accessToken
-      if (token) {
-        localStorage.setItem('authToken', token)
-        if (data.role) {
-          localStorage.setItem('userRole', data.role.toLowerCase())
-        }
-      }
-      return data
+      body: JSON.stringify({ email: email.trim().toLowerCase(), password: password.trim(), rememberMe })
     })
+
+    if (!response.ok) {
+      const message = await readErrorMessage(
+        response,
+        response.status === 401
+          ? 'Identifiants incorrects. Veuillez réessayer.'
+          : 'Connexion impossible. Veuillez réessayer.'
+      )
+      throw new Error(message)
+    }
+
+    const data = await response.json()
+    const token = data.token || data.accessToken
+    if (token) {
+      const storage = rememberMe ? localStorage : sessionStorage
+      const secondaryStorage = rememberMe ? sessionStorage : localStorage
+
+      secondaryStorage.removeItem('authToken')
+      secondaryStorage.removeItem('refreshToken')
+      secondaryStorage.removeItem('tokenExpiration')
+      secondaryStorage.removeItem('userRole')
+      secondaryStorage.removeItem('companyName')
+
+      storage.setItem('authToken', token)
+      if (data.role) {
+        storage.setItem('userRole', data.role.toLowerCase())
+      }
+      if (data.companyName) {
+        storage.setItem('companyName', data.companyName)
+      }
+      if (data.tokenExpiration) {
+        storage.setItem('tokenExpiration', data.tokenExpiration)
+      }
+      if (data.refreshToken) {
+        storage.setItem('refreshToken', data.refreshToken)
+      }
+    }
+    return data
   },
 
   /**
@@ -434,45 +433,49 @@ const authService = {
    * @param {string} email - User email
    * @returns {Promise} Response from API
    */
-  requestPasswordReset(email) {
-    return fetch(`${API_BASE_URL}/auth/forgot-password`, {
+  async requestPasswordReset(email) {
+    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email })
-    }).then(response => {
-      if (!response.ok) {
-        throw new Error('Échec de la demande de réinitialisation')
-      }
-      return response.json()
+      body: JSON.stringify({ email: email.trim().toLowerCase() })
     })
+
+    if (!response.ok) {
+      const message = await readErrorMessage(response, 'Échec de la demande de réinitialisation')
+      throw new Error(message)
+    }
+    return response.json()
   },
 
   /**
    * Reset password with token
+   * @param {string} email - User email
    * @param {string} token - Reset token
    * @param {string} newPassword - New password
+   * @param {string} confirmPassword - Password confirmation
    * @returns {Promise} Response from API
    */
-  resetPassword(email, token, newPassword, confirmPassword) {
-    return fetch(`${API_BASE_URL}/auth/reset-password`, {
+  async resetPassword(email, token, newPassword, confirmPassword) {
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        email,
+        email: email.trim().toLowerCase(),
         token,
         newPassword,
         confirmPassword
       })
-    }).then(response => {
-      if (!response.ok) {
-        throw new Error('Échec de la réinitialisation du mot de passe')
-      }
-      return response.json()
     })
+
+    if (!response.ok) {
+      const message = await readErrorMessage(response, 'Échec de la réinitialisation du mot de passe')
+      throw new Error(message)
+    }
+    return response.json()
   },
 
   /**

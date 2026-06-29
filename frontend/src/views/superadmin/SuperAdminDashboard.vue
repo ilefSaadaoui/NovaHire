@@ -170,8 +170,7 @@ const openCompanyModal = (company = null) => {
     companyForm.value = {
       name: '', size: '', industry: '', website: '', description: '',
       contactEmail: '', contactPhone: '', address: '', city: '', postalCode: '', country: '',
-      isActive: true,
-      primaryColor: '#6C63FF', secondaryColor: '#00D9FF'
+      isActive: true
     }
   }
   showCompanyModal.value = true
@@ -354,14 +353,17 @@ onMounted(async () => {
 }
 
 /* CELESTIAL BACKGROUND ORBS */
+.celestial-bg,
+.celestial-bg * {
+  pointer-events: none !important;
+}
 .celestial-bg {
-  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  position: absolute; inset: 0; z-index: 0; overflow: hidden;
 }
 .c-orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(120px);
-  pointer-events: none;
   transition: opacity 0.5s;
 }
 .orb-1 {

@@ -75,7 +75,7 @@
               <label for="login-email">Adresse e-mail</label>
               <div class="input-shell">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                <input id="login-email" type="email" v-model="email" placeholder="Votre adresse e-mail" required @input="validateField('email')" />
+                <input id="login-email" type="email" v-model="email" placeholder="Votre adresse e-mail" autocomplete="email" required @input="validateField('email')" />
               </div>
               <span v-if="errors.email" class="field-error">{{ errors.email }}</span>
             </div>
@@ -87,9 +87,17 @@
               </div>
               <div class="input-shell">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <input id="login-pw" type="password" v-model="password" placeholder="Votre mot de passe" required @input="validateField('password')" />
+                <input id="login-pw" type="password" v-model="password" placeholder="Votre mot de passe" autocomplete="current-password" required @input="validateField('password')" />
               </div>
               <span v-if="errors.password" class="field-error">{{ errors.password }}</span>
+            </div>
+
+            <div class="field remember-field">
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="rememberMe" />
+                <span class="checkbox-custom" aria-hidden="true"></span>
+                <span class="checkbox-text">Se souvenir de moi</span>
+              </label>
             </div>
 
             <button type="submit" class="submit-btn" :disabled="isLoading">
@@ -129,6 +137,7 @@ export default {
       logoUrl,
       email: '',
       password: '',
+      rememberMe: false,
       isLoading: false,
       errorMessage: '',
       errors: { email: '', password: '' },
@@ -155,6 +164,13 @@ export default {
   },
   created() {
     this.fetchRecruitersCount()
+    const rememberedEmail = localStorage.getItem('rememberedEmail')
+    if (rememberedEmail) {
+      this.email = rememberedEmail
+      this.rememberMe = true
+    }
+    // Ancien comportement : mot de passe mémorisé → provoque des 401 après reset
+    localStorage.removeItem('rememberedPassword')
   },
   beforeUnmount() {
     if (this.counterAnimationFrameId) {
@@ -220,8 +236,15 @@ export default {
       this.isLoading = true
       this.errorMessage = ''
       try {
-        const data = await this.authStore.login(this.email, this.password)
+        const data = await this.authStore.login(this.email.trim(), this.password.trim(), this.rememberMe)
         const role = (data.role || '').toLowerCase()
+
+        if (this.rememberMe) {
+          localStorage.setItem('rememberedEmail', this.email.trim())
+        } else {
+          localStorage.removeItem('rememberedEmail')
+        }
+        localStorage.removeItem('rememberedPassword')
         
         if (role === 'superadmin') {
           this.$router.push('/superadmin/dashboard')
@@ -448,7 +471,9 @@ export default {
 }
 .title-accent {
   background: linear-gradient(135deg, #00A7E1 0%, #8B5CF6 50%, #F7C902 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   background-size: 200% 200%;
   animation: gradientShift 6s ease infinite;
 }
@@ -542,7 +567,64 @@ export default {
 }
 
 /* Form */
-.login-form { display: flex; flex-direction: column; gap: 24px; }
+.login-form { display: flex; flex-direction: column; gap: 20px; }
+
+.remember-field {
+  display: flex; align-items: center;
+  margin-top: -4px;
+}
+
+.checkbox-label {
+  display: inline-flex; align-items: center; gap: 12px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-custom {
+  width: 18px; height: 18px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);
+  margin-right: 10px;
+}
+
+.checkbox-custom::after {
+  content: '';
+  width: 7px; height: 11px;
+  border: solid #00A7E1;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0.65);
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.checkbox-label input:checked + .checkbox-custom {
+  border-color: #00A7E1;
+  background: rgba(0,167,225,0.18);
+}
+
+.checkbox-label input:checked + .checkbox-custom::after {
+  opacity: 1;
+  transform: rotate(45deg) scale(1);
+}
+
+.checkbox-text {
+  color: rgba(255, 255, 255, 0.88);
+}
 
 .field label {
   display: block; font-size: 13px; font-weight: 600;
@@ -550,10 +632,15 @@ export default {
 }
 .label-row { display: flex; justify-content: space-between; align-items: center; }
 .forgot-link {
-  font-size: 12px; color: rgba(255,255,255,0.7); text-decoration: none;
-  font-weight: 600; transition: 0.3s;
+  font-size: 12px;
+  color: #0ea5e9;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s ease;
 }
-.forgot-link:hover { color: #F7C902; }
+.forgot-link:hover {
+  color: #F7C902;
+}
 
 .input-shell { position: relative; }
 .input-shell svg {
@@ -678,5 +765,68 @@ export default {
 @media (max-width: 500px) {
   .login-card { padding: 32px 24px; }
   .card-header h2 { font-size: 22px; }
+}
+
+/* ─── LIGHT MODE OVERRIDES ─── */
+:global(body:not(.dark-mode) .auth-celestial) {
+  background: #f4f7fe !important;
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .welcome-desc) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .trust-item) {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .trust-text strong) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .trust-text span) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .glass-panel) {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+}
+:global(body:not(.dark-mode) .card-header h2) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .card-header p) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .field label) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .input-shell input) {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .input-shell svg) {
+  color: rgba(0, 0, 0, 0.4);
+}
+:global(body:not(.dark-mode) .checkbox-label) {
+  color: rgba(15, 23, 42, 0.88);
+}
+:global(body:not(.dark-mode) .checkbox-text) {
+  color: rgba(15, 23, 42, 0.88);
+}
+:global(body:not(.dark-mode) .divider::before),
+:global(body:not(.dark-mode) .divider::after) {
+  background: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .divider span) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .register-link) {
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #475569;
+}
+:global(body:not(.dark-mode) .register-link:hover) {
+  border-color: rgba(0, 0, 0, 0.2);
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.02);
 }
 </style>

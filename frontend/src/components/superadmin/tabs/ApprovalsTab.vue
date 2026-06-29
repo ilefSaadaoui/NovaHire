@@ -75,6 +75,8 @@
 import { ref, onMounted } from 'vue'
 import adminService from '@/services/adminService'
 import { useAdminStore } from '@/stores/adminStore'
+import { useModalStore } from '@/stores/modalStore'
+import { useToastStore } from '@/stores/toastStore'
 
 const adminStore = useAdminStore()
 const pendingCompanies = ref([])
@@ -98,24 +100,33 @@ const approveCompany = async (company) => {
   try {
     await adminService.approveCompany(company.id)
     pendingCompanies.value = pendingCompanies.value.filter(c => c.id !== company.id)
-    // Update global admin store if needed
     adminStore.fetchCompanies()
+    useToastStore().show(`${company.name} a été approuvée avec succès.`, 'success')
   } catch (err) {
-    alert('Erreur lors de l\'approbation')
+    useToastStore().show('Erreur lors de l\'approbation.', 'error')
   } finally {
     actionLoading.value = null
   }
 }
 
 const rejectCompany = async (company) => {
-  if (!confirm(`Êtes-vous sûr de vouloir rejeter l'inscription de ${company.name} ?`)) return
-  
+  const modalStore = useModalStore()
+  const confirmed = await modalStore.confirm({
+    title: 'Refuser cette inscription ?',
+    message: `Êtes-vous sûr de vouloir rejeter l’inscription de ${company.name} ? Cette action est définitive.`,
+    confirmText: 'Refuser',
+    cancelText: 'Annuler',
+    type: 'danger'
+  })
+  if (!confirmed) return
+
   actionLoading.value = company.id
   try {
     await adminService.rejectCompany(company.id)
     pendingCompanies.value = pendingCompanies.value.filter(c => c.id !== company.id)
+    useToastStore().show(`L’inscription de ${company.name} a été refusée.`, 'info')
   } catch (err) {
-    alert('Erreur lors du rejet')
+    useToastStore().show('Erreur lors du rejet.', 'error')
   } finally {
     actionLoading.value = null
   }
@@ -136,7 +147,7 @@ onMounted(fetchPending)
 <style scoped>
 .sa-tab-container { animation: fadeIn 0.5s ease-out; }
 .sa-tab-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-.sa-tab-title { font-size: 32px; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.sa-tab-title { font-size: 32px; font-weight: 800; margin-bottom: 8px; color: var(--text-primary); }
 .sa-tab-desc { color: var(--text-muted); font-size: 15px; }
 
 .header-stat-card { padding: 16px 24px; display: flex; flex-direction: column; align-items: center; min-width: 120px; }
@@ -161,7 +172,7 @@ onMounted(fetchPending)
   display: flex; align-items: center; justify-content: center;
   color: white; font-weight: 800; font-size: 20px; box-shadow: 0 4px 12px rgba(108, 99, 255, 0.3);
 }
-.company-info h4 { font-size: 18px; font-weight: 700; margin: 0; color: white; }
+.company-info h4 { font-size: 18px; font-weight: 700; margin: 0; color: var(--text-primary); }
 .industry-tag { font-size: 12px; color: var(--accent-color); font-weight: 600; opacity: 0.8; }
 .date-tag { margin-left: auto; font-size: 11px; color: var(--text-muted); }
 
@@ -178,8 +189,8 @@ onMounted(fetchPending)
 }
 .sa-btn-accent { background: var(--accent-grad); color: white; box-shadow: 0 4px 12px rgba(108, 99, 255, 0.2); }
 .sa-btn-accent:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(108, 99, 255, 0.4); }
-.sa-btn-outline { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; }
-.sa-btn-outline:hover { background: rgba(255,255,255,0.1); }
+.sa-btn-outline { background: rgba(100,100,120,0.08); border: 1px solid rgba(100,100,120,0.2); color: var(--text-primary); }
+.sa-btn-outline:hover { background: rgba(100,100,120,0.14); }
 .sa-btn-danger:hover { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); }
 
 .sa-spinner-mini { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }

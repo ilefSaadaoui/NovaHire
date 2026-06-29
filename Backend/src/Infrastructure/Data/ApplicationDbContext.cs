@@ -13,7 +13,9 @@ using Application.Interfaces;
 namespace Infrastructure.Data
 {
     /// <summary>
-    /// Contexte de base de données principal
+    /// Contexte de base de données principal de l'application (Entity Framework Core).
+    /// Gère les ensembles de données (DbSets), l'isolation multi-tenant globale via des filtres de requête,
+    /// la configuration de la base de données et la mise à jour automatique des dates de modification.
     /// </summary>
     public class ApplicationDbContext : DbContext
     {
@@ -21,6 +23,12 @@ namespace Infrastructure.Data
         private readonly Guid _companyId;
         private readonly string _role;
 
+        /// <summary>
+        /// Initialise une nouvelle instance de la classe <see cref="ApplicationDbContext"/>.
+        /// Récupère l'identifiant de la société et le rôle de l'utilisateur courant pour appliquer la restriction d'accès multi-tenant.
+        /// </summary>
+        /// <param name="options">Options de configuration du DbContext.</param>
+        /// <param name="currentUserService">Service fournissant les informations sur l'utilisateur connecté.</param>
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options,
             ICurrentUserService currentUserService)
@@ -31,28 +39,64 @@ namespace Infrastructure.Data
             _role = _currentUserService.Role ?? string.Empty;
         }
 
-        // DbSets
+        // ─── Ensembles de Données (DbSets) ──────────────────────────────────────
+
+        /// <summary> Table des utilisateurs (recruteurs, administrateurs). </summary>
         public DbSet<User>? Users { get; set; }
+
+        /// <summary> Table des entreprises (tenants). </summary>
         public DbSet<Company>? Companies { get; set; }
+
+        /// <summary> Table des offres d'emploi. </summary>
         public DbSet<JobOffer>? JobOffers { get; set; }
+
+        /// <summary> Table des candidats enregistrés. </summary>
         public DbSet<Candidate>? Candidates { get; set; }
+
+        /// <summary> Table des candidatures. </summary>
         public DbSet<JobApplication>? JobApplications { get; set; }
+
+        /// <summary> Table des commentaires de discussion sur les candidatures. </summary>
         public DbSet<JobApplicationComment>? JobApplicationComments { get; set; }
+
+        /// <summary> Table des entretiens de recrutement planifiés. </summary>
         public DbSet<Interview>? Interviews { get; set; }
+
+        /// <summary> Table des départements d'entreprise. </summary>
         public DbSet<Department>? Departments { get; set; }
+
+        /// <summary> Table des journaux d'activité (audit trail). </summary>
         public DbSet<ActivityLog>? ActivityLogs { get; set; }
+
+        /// <summary> Table des notifications d'application. </summary>
         public DbSet<Notification>? Notifications { get; set; }
+
+        /// <summary> Table des évaluations chiffrées de candidatures. </summary>
         public DbSet<ApplicationRating>? ApplicationRatings { get; set; }
+
+        /// <summary> Table des quiz d'évaluation de présélection. </summary>
         public DbSet<Quiz>? Quizzes { get; set; }
+
+        /// <summary> Table des questions individuelles de quiz. </summary>
         public DbSet<QuizQuestion>? QuizQuestions { get; set; }
+
+        /// <summary> Table des scores et réponses des candidats aux quiz. </summary>
         public DbSet<CandidateQuizResult>? CandidateQuizResults { get; set; }
+
+        /// <summary> Table des messages de contact publics. </summary>
         public DbSet<ContactMessage>? ContactMessages { get; set; }
 
+        /// <summary>
+        /// Configure le modèle de données, les relations, les clés, les convertisseurs JSON et les filtres de requête globaux pour le multi-tenant.
+        /// </summary>
+        /// <param name="modelBuilder">Le constructeur de modèle utilisé pour configurer les entités.</param>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Prepare value comparers for collection properties stored as JSON
+            // Préparation des comparateurs de valeurs pour les propriétés complexes stockées sous forme de chaînes JSON.
+            // EF Core a besoin de ces comparateurs pour détecter correctement si une liste ou un dictionnaire a été modifié.
+            
             var listStringComparer = new ValueComparer<List<string>>(
                 (a, b) => (a ?? new List<string>()).SequenceEqual(b ?? new List<string>()),
                 v => v == null ? 0 : v.Aggregate(0, (h, e) => ((h * 397) ^ (e == null ? 0 : e.GetHashCode()))),
@@ -80,7 +124,7 @@ namespace Infrastructure.Data
                 v => v == null ? 0 : JsonSerializer.Serialize(v).GetHashCode(),
                 v => v == null ? new List<InterviewQuestionRecord>() : JsonSerializer.Deserialize<List<InterviewQuestionRecord>>(JsonSerializer.Serialize(v)) ?? new List<InterviewQuestionRecord>());
 
-            // Configuration des entités
+            // Configuration spécifique de chaque entité
             ConfigureUser(modelBuilder);
             ConfigureCompany(modelBuilder);
             ConfigureCandidate(modelBuilder);
@@ -98,10 +142,13 @@ namespace Infrastructure.Data
             ConfigureCandidateQuizResult(modelBuilder);
             ConfigureContactMessage(modelBuilder);
 
-            // Seed data initial with deterministic values (avoid DateTime.UtcNow / Guid.NewGuid() in HasData)
+            // Insertion des données initiales (seeding) avec des valeurs déterministes (pour éviter les migrations inutiles)
             SeedInitialData(modelBuilder);
         }
 
+        /// <summary>
+        /// Configure l'entité User (Clé, Index unique sur l'Email, Rôles et filtre global multi-tenant).
+        /// </summary>
         private void ConfigureUser(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<User>(entity =>
@@ -124,28 +171,31 @@ namespace Infrastructure.Data
                     .HasMaxLength(100);
 
                 entity.Property(e => e.Role)
-                    .HasConversion<int>(); // Store enum as int
+                    .HasConversion<int>(); // Stocke l'enum en tant qu'entier en base de données
 
-                // Relation avec Company (nullable pour les candidats)
+                // Relation avec Company (nullable pour les candidats ou les administrateurs globaux)
                 entity.HasOne(e => e.Company)
                     .WithMany(c => c.Users)
                     .HasForeignKey(e => e.CompanyId)
                     .OnDelete(DeleteBehavior.SetNull);
 
-                // Global Query Filter for Users (Multi-tenancy)
-                // Unauthenticated (login/register) and SuperAdmin see everyone.
-                // Authenticated non-SuperAdmin users only see their own company.
-                entity.HasQueryFilter(u => _role == string.Empty || _role == "SuperAdmin" || (u.CompanyId == _companyId && _companyId != Guid.Empty));
+                // Filtre de requête global pour les utilisateurs (Multi-tenancy) :
+                // Les utilisateurs anonymes et les SuperAdmin voient tout le monde. Les autres ne voient que leur propre entreprise.
+                entity.HasQueryFilter
+                (u => _role == string.Empty || _role == "SuperAdmin" || (u.CompanyId == _companyId && _companyId != Guid.Empty));
             });
         }
 
+        /// <summary>
+        /// Configure l'entité Candidate (Clés, Index unique combiné Email + CompanyId et filtre global).
+        /// </summary>
         private void ConfigureCandidate(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Candidate>(entity =>
             {
                 entity.HasKey(e => e.Id);
 
-                // Index unique par entreprise (un même email peut exister dans deux entreprises différentes)
+                // Index unique par entreprise (un même e-mail peut postuler chez différents tenants/entreprises)
                 entity.HasIndex(e => new { e.Email, e.CompanyId })
                     .IsUnique();
 
@@ -155,7 +205,7 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.CompanyId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // Global Query Filter for Candidates (Multi-tenancy)
+                // Filtre global multi-tenant pour les candidats
                 entity.HasQueryFilter(c => _role == string.Empty || _role == "SuperAdmin" || c.CompanyId == _companyId);
 
                 entity.Property(e => e.Email)
@@ -175,6 +225,9 @@ namespace Infrastructure.Data
             });
         }
 
+        /// <summary>
+        /// Configure l'entité Company (Clé, Propriétés requises, Couleurs et Index).
+        /// </summary>
         private void ConfigureCompany(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Company>(entity =>
@@ -202,13 +255,13 @@ namespace Infrastructure.Data
                     .HasMaxLength(7)
                     .HasDefaultValue("#000000");
 
-
-
-                // Index
                 entity.HasIndex(e => e.Name);
             });
         }
 
+        /// <summary>
+        /// Configure l'entité JobOffer (Clé, conversions d'énumérations et de listes stockées en JSON, Owned Types et filtre global).
+        /// </summary>
         private void ConfigureJobOffer(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<JobOffer>(entity =>
@@ -223,10 +276,10 @@ namespace Infrastructure.Data
                     .IsRequired();
 
                 entity.Property(e => e.Type)
-                    .HasConversion<int>(); // Store enum as int
+                    .HasConversion<int>();
 
                 entity.Property(e => e.Status)
-                    .HasConversion<int>(); // Store enum as int
+                    .HasConversion<int>();
 
                 entity.Property(e => e.RemotePolicy)
                     .HasConversion<int>()
@@ -236,6 +289,7 @@ namespace Infrastructure.Data
                     .HasConversion<int>()
                     .IsRequired(false);
 
+                // Conversion de la liste de compétences (List<string>) en chaîne JSON en base de données
                 var skillsProp = entity.Property(e => e.Skills);
                 skillsProp.HasConversion(
                     v => v != null ? JsonSerializer.Serialize(v) : "[]",
@@ -248,7 +302,7 @@ namespace Infrastructure.Data
                     v => v == null ? 0 : v.Aggregate(0, (h, e) => ((h * 397) ^ (e == null ? 0 : e.GetHashCode()))),
                     v => v == null ? new List<string>() : v.ToList()));
 
-                // Relations
+                // Relations de l'offre d'emploi
                 entity.HasOne(e => e.Company)
                     .WithMany(c => c.JobOffers)
                     .HasForeignKey(e => e.CompanyId)
@@ -259,7 +313,7 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.CreatedById)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // Configuration des owned entities with null-safe conversion
+                // Configuration des types dépendants (Owned Entities) stockés dans la même table
                 entity.OwnsOne(e => e.FormConfig, fc =>
                 {
                     var customFieldsProp = fc.Property(p => p.CustomFields);
@@ -287,17 +341,19 @@ namespace Infrastructure.Data
 
                 entity.OwnsOne(e => e.DisplayConfig);
 
-                // Index pour performance
+                // Indexation pour l'optimisation des performances
                 entity.HasIndex(e => e.CompanyId);
                 entity.HasIndex(e => e.Status);
                 entity.HasIndex(e => e.PublishedAt);
 
-                // Global Query Filter for JobOffers (Multi-tenancy)
-                // Unauthenticated and SuperAdmin bypass. Others filtered by CompanyId.
+                // Filtre global multi-tenant pour les offres
                 entity.HasQueryFilter(j => _role == string.Empty || _role == "SuperAdmin" || j.CompanyId == _companyId);
             });
         }
 
+        /// <summary>
+        /// Configure l'entité JobApplication (Relations, conversion JSON des réponses de formulaires et de l'analyse IA complète).
+        /// </summary>
         private void ConfigureJobApplication(ModelBuilder modelBuilder, ValueComparer<List<string>> listStringComparer, ValueComparer<List<WorkExperience>> workExpComparer, ValueComparer<List<Education>> educationComparer, ValueComparer<List<string>> identifiedSkillsComparer, ValueComparer<Dictionary<string, string>> dictComparer, ValueComparer<List<InterviewQuestionRecord>> interviewQuestionComparer)
         {
             modelBuilder.Entity<JobApplication>(entity =>
@@ -305,7 +361,7 @@ namespace Infrastructure.Data
                 entity.HasKey(e => e.Id);
 
                 entity.Property(e => e.Status)
-                    .HasConversion<int>(); // Store enum as int
+                    .HasConversion<int>();
 
                 // Relations
                 entity.HasOne(e => e.JobOffer)
@@ -323,7 +379,7 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.ReviewedById)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // Conversion des objets complexes en JSON with null-safe handling
+                // Conversion des réponses personnalisées (Dictionary) en chaîne JSON
                 var customFieldsProp = entity.Property(e => e.CustomFieldsData);
                 customFieldsProp.HasConversion(
                     v => v != null ? JsonSerializer.Serialize(v) : "{}",
@@ -332,6 +388,7 @@ namespace Infrastructure.Data
                         : new Dictionary<string, string>());
                 customFieldsProp.Metadata.SetValueComparer(dictComparer);
 
+                // Mappage de l'entité possédée AIAnalysis et ses sous-propriétés complexes en JSON
                 entity.OwnsOne(e => e.AIAnalysis, ai =>
                 {
                     ai.OwnsOne(a => a.ExtractedData, ed =>
@@ -394,18 +451,20 @@ namespace Infrastructure.Data
                     interviewQuestionsProp.Metadata.SetValueComparer(interviewQuestionComparer);
                 });
 
-                // Index pour performance
+                // Indexation pour les performances
                 entity.HasIndex(e => e.JobOfferId);
                 entity.HasIndex(e => e.CandidateId);
                 entity.HasIndex(e => e.Status);
                 entity.HasIndex(e => e.AppliedAt);
 
-                // Global Query Filter for JobApplications (Multi-tenancy)
-                // Unauthenticated and SuperAdmin bypass. Others filtered by CompanyId.
+                // Filtre global multi-tenant pour les candidatures
                 entity.HasQueryFilter(ja => _role == string.Empty || _role == "SuperAdmin" || ja.JobOffer!.CompanyId == _companyId);
             });
         }
 
+        /// <summary>
+        /// Configure l'entité JobApplicationComment (Clé, contenu requis, relations et filtre global multi-tenant).
+        /// </summary>
         private void ConfigureJobApplicationComment(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<JobApplicationComment>(entity =>
@@ -425,11 +484,13 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.AuthorId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // Global Query Filter: SuperAdmin sees all, others see comments for applications belonging to their company
                 entity.HasQueryFilter(c => _role == string.Empty || _role == "SuperAdmin" || c.JobApplication.JobOffer!.CompanyId == _companyId);
             });
         }
 
+        /// <summary>
+        /// Configure l'entité ApplicationRating (Note requise, relations et filtre global).
+        /// </summary>
         private void ConfigureApplicationRating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<ApplicationRating>(entity =>
@@ -448,11 +509,13 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.RecruiterId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // Global Query Filter: Multi-tenancy
                 entity.HasQueryFilter(r => _role == string.Empty || _role == "SuperAdmin" || r.JobApplication.JobOffer!.CompanyId == _companyId);
             });
         }
 
+        /// <summary>
+        /// Configure l'entité Interview (Type requis, relations, statut et filtre global).
+        /// </summary>
         private void ConfigureInterview(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Interview>(entity =>
@@ -473,7 +536,6 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.RecruiterId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // Global Query Filter: SuperAdmin sees all, others see interviews for applications belonging to their company
                 entity.HasQueryFilter(i => _role == string.Empty || _role == "SuperAdmin" || i.JobApplication!.JobOffer!.CompanyId == _companyId);
 
                 entity.Property(e => e.Status)
@@ -481,6 +543,9 @@ namespace Infrastructure.Data
             });
         }
 
+        /// <summary>
+        /// Configure l'entité Notification (Relations, filtre global multi-tenant).
+        /// </summary>
         private void ConfigureNotification(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Notification>(entity =>
@@ -495,6 +560,9 @@ namespace Infrastructure.Data
             });
         }
 
+        /// <summary>
+        /// Configure l'entité Department (Relations, propriétés requises et filtre global).
+        /// </summary>
         private void ConfigureDepartment(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Department>(entity =>
@@ -510,12 +578,13 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.CompanyId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                // Global Query Filter
                 entity.HasQueryFilter(d => _role == string.Empty || _role == "SuperAdmin" || d.CompanyId == _companyId);
             });
         }
 
-
+        /// <summary>
+        /// Configure l'entité ActivityLog (Audit) (Filtre global de multi-tenancy).
+        /// </summary>
         private void ConfigureActivityLog(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<ActivityLog>(entity =>
@@ -523,11 +592,13 @@ namespace Infrastructure.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Action).IsRequired();
 
-                // Global Query Filter
                 entity.HasQueryFilter(l => _role == string.Empty || _role == "SuperAdmin" || l.CompanyId == _companyId);
             });
         }
 
+        /// <summary>
+        /// Configure l'entité Quiz (Relations, titre requis, filtre global).
+        /// </summary>
         private void ConfigureQuiz(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Quiz>(entity =>
@@ -535,15 +606,17 @@ namespace Infrastructure.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
                 entity.HasOne(e => e.JobOffer)
-                    .WithMany() // Or Add ICollection<Quiz> to JobOffer if needed
+                    .WithMany()
                     .HasForeignKey(e => e.JobOfferId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                // Multi-tenancy filter
                 entity.HasQueryFilter(q => _role == string.Empty || _role == "SuperAdmin" || (q.JobOffer != null && q.JobOffer.CompanyId == _companyId));
             });
         }
 
+        /// <summary>
+        /// Configure l'entité QuizQuestion (Relations, texte de question requis et filtre global).
+        /// </summary>
         private void ConfigureQuizQuestion(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<QuizQuestion>(entity =>
@@ -555,18 +628,20 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.QuizId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                // Matching multi-tenancy filter to avoid EF validation warning
                 entity.HasQueryFilter(q => _role == string.Empty || _role == "SuperAdmin" || (q.Quiz != null && q.Quiz.JobOffer != null && q.Quiz.JobOffer.CompanyId == _companyId));
             });
         }
 
+        /// <summary>
+        /// Configure l'entité CandidateQuizResult (Relations et filtre global).
+        /// </summary>
         private void ConfigureCandidateQuizResult(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<CandidateQuizResult>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.HasOne(e => e.JobApplication)
-                    .WithMany() // Or add navigation to JobApplication
+                    .WithMany()
                     .HasForeignKey(e => e.JobApplicationId)
                     .OnDelete(DeleteBehavior.Cascade);
 
@@ -575,11 +650,13 @@ namespace Infrastructure.Data
                     .HasForeignKey(e => e.QuizId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                // Multi-tenancy filter
                 entity.HasQueryFilter(r => _role == string.Empty || _role == "SuperAdmin" || (r.JobApplication != null && r.JobApplication.JobOffer != null && r.JobApplication.JobOffer.CompanyId == _companyId));
             });
         }
 
+        /// <summary>
+        /// Configure l'entité ContactMessage (Clé et propriétés requises).
+        /// </summary>
         private void ConfigureContactMessage(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<ContactMessage>(entity =>
@@ -592,14 +669,15 @@ namespace Infrastructure.Data
             });
         }
 
+        /// <summary>
+        /// Gère l'insertion des données de démonstration et d'initialisation en base de données.
+        /// Utilise des valeurs fixes pour les dates et identifiants pour garantir l'indépendance des builds.
+        /// </summary>
         private void SeedInitialData(ModelBuilder modelBuilder)
         {
-            // Use a deterministic seed timestamp to avoid EF model changes each build
             var seedCreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-
-
-            // Société par défaut - NeoLedge
+            // Société de démonstration par défaut - NeoLedge
             var defaultCompanyId = Guid.Parse("11111111-1111-1111-1111-111111111111");
             modelBuilder.Entity<Company>().HasData(new
             {
@@ -613,7 +691,7 @@ namespace Infrastructure.Data
                 CreatedAt = seedCreatedAt
             });
 
-            // Seed Departments for Demo
+            // Départements de démonstration
             var techDeptId = Guid.Parse("d001d001-d001-d001-d001-d001d001d001");
             var hrDeptId = Guid.Parse("d002d002-d002-d002-d002-d002d002d002");
             modelBuilder.Entity<Department>().HasData(
@@ -621,17 +699,17 @@ namespace Infrastructure.Data
                 new Department { Id = hrDeptId, Name = "Human Resources", CompanyId = defaultCompanyId }
             );
 
-            // Base64 encoded SHA256 hash for "Admin@123"
+            // Hash de mot de passe généré pour "Admin@123"
             var superAdminPasswordHash = "6G94qKPK8LYNjnTllCqm2G3BUM08AzOK7yW30tfjrMc=";
 
-            // Super Admin par défaut (Global)
+            // Super Administrateur Global — compte unique de la plateforme
             var superAdminId = Guid.Parse("22222222-2222-2222-2222-222222222222");
             modelBuilder.Entity<User>().HasData(new User
             {
                 Id = superAdminId,
                 FirstName = "Admin",
-                LastName = "NeoLedge",
-                Email = "admin@neoledge.com",
+                LastName = "Plateforme",
+                Email = "adminplatforme@gmail.com",
                 PasswordHash = superAdminPasswordHash,
                 Role = UserRole.SuperAdmin,
                 IsActive = true,
@@ -640,7 +718,7 @@ namespace Infrastructure.Data
                 CompanyId = null
             });
 
-            // Company Admin (Local)
+            // Administrateur d'Entreprise
             var adminId = Guid.Parse("10001000-1000-1000-1000-100010001000");
             modelBuilder.Entity<User>().HasData(new User
             {
@@ -658,7 +736,7 @@ namespace Infrastructure.Data
                 DepartmentId = hrDeptId
             });
 
-            // Recruiter Aya
+            // Recruteur Aya
             var rec1Id = Guid.Parse("10001000-1000-1000-1000-100010001001");
             modelBuilder.Entity<User>().HasData(new User
             {
@@ -676,7 +754,7 @@ namespace Infrastructure.Data
                 DepartmentId = techDeptId
             });
 
-            // Recruiter Mehdi
+            // Recruteur Mehdi
             var rec2Id = Guid.Parse("10001000-1000-1000-1000-100010001002");
             modelBuilder.Entity<User>().HasData(new User
             {
@@ -695,19 +773,27 @@ namespace Infrastructure.Data
             });
         }
 
-        // Override SaveChanges pour mettre à jour automatiquement les timestamps
+        /// <summary>
+        /// Intercepte et surcharge l'enregistrement synchrone pour mettre à jour les timestamps.
+        /// </summary>
         public override int SaveChanges()
         {
             UpdateTimestamps();
             return base.SaveChanges();
         }
 
+        /// <summary>
+        /// Intercepte et surcharge l'enregistrement asynchrone pour mettre à jour les timestamps.
+        /// </summary>
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             UpdateTimestamps();
             return base.SaveChangesAsync(cancellationToken);
         }
 
+        /// <summary>
+        /// Parcourt les entités modifiées et met à jour leur champ 'UpdatedAt' avec la date UTC actuelle.
+        /// </summary>
         private void UpdateTimestamps()
         {
             var entries = ChangeTracker.Entries()

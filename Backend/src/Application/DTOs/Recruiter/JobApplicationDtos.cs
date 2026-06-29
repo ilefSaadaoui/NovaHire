@@ -27,6 +27,7 @@ namespace Application.DTOs.Recruiter
     public class CandidateProfileDto
     {
         public Guid Id { get; set; }
+        public Guid JobOfferId { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
@@ -53,6 +54,7 @@ namespace Application.DTOs.Recruiter
         public int? QuizScore { get; set; }
         public bool QuizSent { get; set; }
         public DateTime? QuizExpiresAt { get; set; }
+        public bool HasQuizGenerated { get; set; }
     }
 
     public class InterviewQuestionDto

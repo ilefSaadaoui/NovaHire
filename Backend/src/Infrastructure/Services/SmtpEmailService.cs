@@ -10,18 +10,34 @@ using MimeKit;
 
 namespace Infrastructure.Services
 {
-    // Production-capable SMTP/email service using MailKit. It reads EmailSettings via IOptions<EmailSettings>.
+    /// <summary>
+    /// Service d'envoi d'e-mails utilisant le protocole SMTP via la bibliothèque MailKit.
+    /// Lit la configuration depuis les options d'application (EmailSettings).
+    /// </summary>
     public class SmtpEmailService : IEmailService
     {
         private readonly ILogger<SmtpEmailService> _logger;
         private readonly EmailSettings _settings;
 
+        /// <summary>
+        /// Initialise une nouvelle instance de la classe <see cref="SmtpEmailService"/>.
+        /// </summary>
+        /// <param name="logger">L'instance du logger pour le suivi et le diagnostic.</param>
+        /// <param name="options">Les options de configuration pour les e-mails.</param>
         public SmtpEmailService(ILogger<SmtpEmailService> logger, IOptions<EmailSettings> options)
         {
             _logger = logger;
             _settings = options?.Value ?? new EmailSettings();
         }
 
+        /// <summary>
+        /// Crée un message MimeMessage structuré pour l'envoi d'e-mails.
+        /// </summary>
+        /// <param name="to">Adresse e-mail du destinataire.</param>
+        /// <param name="subject">Sujet de l'e-mail.</param>
+        /// <param name="body">Corps de l'e-mail au format HTML.</param>
+        /// <param name="toName">Nom optionnel du destinataire.</param>
+        /// <returns>Une instance configurée de <see cref="MimeMessage"/>.</returns>
         private MimeMessage CreateMessage(string to, string subject, string body, string? toName = null)
         {
             var message = new MimeMessage();
@@ -39,35 +55,45 @@ namespace Infrastructure.Services
             return message;
         }
 
+        /// <summary>
+        /// Supprime les balises HTML d'une chaîne de caractères pour produire une version brute textuelle.
+        /// </summary>
+        /// <param name="html">La chaîne contenant du code HTML.</param>
+        /// <returns>La chaîne nettoyée de ses balises HTML.</returns>
         private string StripHtml(string html)
         {
-            // Very small helper to produce a plain-text fallback. For real usage prefer a robust HTML-to-text library.
+            // Helper minimal pour générer une version texte brut. Pour la production, privilégier une bibliothèque robuste.
             return System.Text.RegularExpressions.Regex.Replace(html, "<.*?>", string.Empty);
         }
 
+        /// <summary>
+        /// Envoie de manière asynchrone le message d'e-mail fourni à travers le client SMTP.
+        /// </summary>
+        /// <param name="message">Le message MimeMessage à envoyer.</param>
+        /// <returns>Une valeur indiquant si l'envoi a réussi ou non.</returns>
         private async Task<bool> SendAsync(MimeMessage message)
         {
-            // If no SMTP server configured, log and return true (design-time friendly). In production this should throw.
+            // Si aucun serveur SMTP n'est configuré, enregistre un log et retourne false pour que l'appelant sache que l'e-mail n'a pas été envoyé.
             if (string.IsNullOrWhiteSpace(_settings.SmtpHost))
             {
-                _logger.LogInformation("SMTP host not configured. Skipping send (design-time/development). Message subject: {Subject}", message.Subject);
-                return true;
+                _logger.LogWarning("SMTP host not configured. Email cannot be sent. Message subject: {Subject}", message.Subject);
+                return false;
             }
 
             try
             {
                 using var client = new SmtpClient();
-                // Accept all SSL certificates (useful in dev); remove in production
+                // Accepte tous les certificats SSL (utile en développement) ; à retirer en production pour des raisons de sécurité
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
                 if (_settings.SmtpPort == 465)
                 {
-                    // Port 465 uses Implicit SSL (SslOnConnect)
+                    // Le port 465 utilise le protocole SSL implicite (SslOnConnect)
                     await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, MailKit.Security.SecureSocketOptions.SslOnConnect).ConfigureAwait(false);
                 }
                 else if (_settings.EnableSsl)
                 {
-                    // Port 587 or other SSL ports use STARTTLS
+                    // Le port 587 ou les autres ports SSL utilisent généralement STARTTLS
                     await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, MailKit.Security.SecureSocketOptions.StartTls).ConfigureAwait(false);
                 }
                 else
@@ -93,6 +119,12 @@ namespace Infrastructure.Services
             }
         }
 
+        /// <summary>
+        /// Envoie un e-mail de confirmation à l'utilisateur lors de son inscription.
+        /// </summary>
+        /// <param name="email">L'adresse e-mail de l'utilisateur.</param>
+        /// <param name="token">Le jeton de validation pour confirmer l'inscription.</param>
+        /// <returns>True si l'envoi a réussi, sinon false.</returns>
         public async Task<bool> SendEmailConfirmationAsync(string email, string token)
         {
             var confirmUrl = _settings.ConfirmationUrl ?? "#";
@@ -101,9 +133,18 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie un e-mail de réinitialisation de mot de passe à l'utilisateur.
+        /// </summary>
+        /// <param name="email">L'adresse e-mail de l'utilisateur concerné.</param>
+        /// <param name="token">Le jeton sécurisé de réinitialisation.</param>
+        /// <returns>True si l'e-mail a été envoyé avec succès, sinon false.</returns>
         public async Task<bool> SendPasswordResetAsync(string email, string token)
         {
-            var resetUrl = _settings.ResetPasswordUrl ?? "http://localhost:3010/reinitialiser-mot-de-passe";
+            var resetUrl = _settings.ResetPasswordUrl ?? "https://localhost:3010/reinitialiser-mot-de-passe";
+            var encodedToken = Uri.EscapeDataString(token);
+            var encodedEmail = Uri.EscapeDataString(email);
+            var resetLink = $"{resetUrl}?token={encodedToken}&email={encodedEmail}";
             var body = $@"
             <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #020617; color: #ffffff; border-radius: 24px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);'>
                 <div style='background: linear-gradient(135deg, #00A7E1, #8B5CF6); padding: 40px; text-align: center; position: relative;'>
@@ -117,7 +158,7 @@ namespace Infrastructure.Services
                         Nous avons reçu une demande de réinitialisation de mot de passe pour votre compte <strong style='color: #00A7E1;'>NovaHire</strong>.
                     </p>
                     <div style='margin: 32px 0; text-align: center;'>
-                        <a href='{resetUrl}?token={token}&email={email}' style='display: inline-block; background: linear-gradient(135deg, #00A7E1, #0077B6); color: #ffffff; text-decoration: none; padding: 16px 36px; border-radius: 14px; font-weight: 700; font-size: 16px; box-shadow: 0 10px 20px rgba(0, 167, 225, 0.3);'>
+                        <a href='{resetLink}' style='display: inline-block; background: linear-gradient(135deg, #00A7E1, #0077B6); color: #ffffff; text-decoration: none; padding: 16px 36px; border-radius: 14px; font-weight: 700; font-size: 16px; box-shadow: 0 10px 20px rgba(0, 167, 225, 0.3);'>
                             Réinitialiser mon mot de passe
                         </a>
                     </div>
@@ -134,6 +175,12 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie un e-mail de bienvenue de base à un nouvel utilisateur.
+        /// </summary>
+        /// <param name="email">L'adresse e-mail de l'utilisateur.</param>
+        /// <param name="firstName">Le prénom de l'utilisateur.</param>
+        /// <returns>True si l'envoi a réussi, sinon false.</returns>
         public async Task<bool> SendWelcomeEmailAsync(string email, string firstName)
         {
             var body = $"<p>Welcome {System.Net.WebUtility.HtmlEncode(firstName)} to NovaHire!</p>";
@@ -141,6 +188,13 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie une notification au recruteur lorsqu'un candidat postule à une offre d'emploi.
+        /// </summary>
+        /// <param name="recruiterEmail">Adresse e-mail du recruteur.</param>
+        /// <param name="jobTitle">Titre de l'offre d'emploi concernée.</param>
+        /// <param name="candidateName">Nom complet du candidat.</param>
+        /// <returns>True si le message a bien été transmis, sinon false.</returns>
         public async Task<bool> SendApplicationNotificationAsync(string recruiterEmail, string jobTitle, string candidateName)
         {
             var body = $"<p>New application for <strong>{System.Net.WebUtility.HtmlEncode(jobTitle)}</strong> by {System.Net.WebUtility.HtmlEncode(candidateName)}.</p>";
@@ -148,6 +202,13 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie un e-mail au candidat pour l'informer du changement de statut de sa candidature.
+        /// </summary>
+        /// <param name="candidateEmail">Adresse e-mail du candidat.</param>
+        /// <param name="jobTitle">Titre du poste concerné.</param>
+        /// <param name="status">Le nouveau statut de la candidature.</param>
+        /// <returns>True si l'envoi a réussi, sinon false.</returns>
         public async Task<bool> SendApplicationStatusUpdateAsync(string candidateEmail, string jobTitle, string status)
         {
             var body = $"<p>Your application for <strong>{System.Net.WebUtility.HtmlEncode(jobTitle)}</strong> has been updated to: {System.Net.WebUtility.HtmlEncode(status)}</p>";
@@ -155,6 +216,14 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie une invitation à un recruteur de la part d'un administrateur d'entreprise.
+        /// </summary>
+        /// <param name="recruiterEmail">Adresse e-mail du nouveau recruteur.</param>
+        /// <param name="tempPassword">Mot de passe temporaire généré automatiquement.</param>
+        /// <param name="companyName">Nom de l'entreprise qui invite.</param>
+        /// <param name="adminName">Nom de l'administrateur à l'origine de l'invitation.</param>
+        /// <returns>True si l'invitation a été envoyée avec succès, sinon false.</returns>
         public async Task<bool> SendRecruiterInvitationAsync(string recruiterEmail, string tempPassword, string companyName, string adminName)
         {
             var loginUrl = _settings.ConfirmationUrl?.Replace("/confirm-email", "/connexion") ?? "http://localhost:3010/connexion";
@@ -221,6 +290,14 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie un e-mail de confirmation de réception de candidature au candidat.
+        /// </summary>
+        /// <param name="candidateEmail">Adresse e-mail du candidat.</param>
+        /// <param name="candidateName">Nom complet du candidat.</param>
+        /// <param name="jobTitle">Titre de l'offre d'emploi postulée.</param>
+        /// <param name="companyName">Nom de l'entreprise proposant le poste.</param>
+        /// <returns>True si le message de confirmation a été envoyé avec succès, sinon false.</returns>
         public async Task<bool> SendApplicationConfirmationAsync(string candidateEmail, string candidateName, string jobTitle, string companyName)
         {
             var body = $@"
@@ -278,16 +355,34 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie un e-mail basique avec un sujet et corps personnalisés.
+        /// </summary>
+        /// <param name="email">Adresse de destination.</param>
+        /// <param name="subject">Sujet de l'e-mail.</param>
+        /// <param name="body">Corps du message au format HTML.</param>
+        /// <returns>True si envoyé avec succès, sinon false.</returns>
         public async Task<bool> SendEmailAsync(string email, string subject, string body)
         {
             var message = CreateMessage(email, subject, body);
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie une invitation d'entretien à un candidat au nom d'un recruteur spécifique.
+        /// Le message sera envoyé depuis l'adresse du système avec l'adresse du recruteur en "Reply-To".
+        /// </summary>
+        /// <param name="candidateEmail">Adresse e-mail du candidat.</param>
+        /// <param name="candidateName">Nom complet du candidat.</param>
+        /// <param name="subject">Sujet de l'invitation.</param>
+        /// <param name="htmlBody">Corps HTML personnalisé du message d'invitation.</param>
+        /// <param name="recruiterEmail">Adresse e-mail professionnelle du recruteur.</param>
+        /// <param name="recruiterName">Nom du recruteur.</param>
+        /// <returns>True si l'envoi a réussi, sinon false.</returns>
         public async Task<bool> SendInterviewInvitationAsync(string candidateEmail, string candidateName, string subject, string htmlBody, string recruiterEmail, string recruiterName)
         {
             var message = new MimeMessage();
-            // Send from the system account but display the recruiter's name
+            // Envoyer depuis le compte système mais en affichant le nom du recruteur
             message.From.Add(new MailboxAddress($"{recruiterName} via NovaHire", _settings.SenderEmail ?? _settings.From));
             message.To.Add(new MailboxAddress(candidateName, candidateEmail));
             message.ReplyTo.Add(new MailboxAddress(recruiterName, recruiterEmail));
@@ -302,6 +397,14 @@ namespace Infrastructure.Services
 
             return await SendAsync(message).ConfigureAwait(false);
         }
+
+        /// <summary>
+        /// Envoie un e-mail informant qu'un compte d'entreprise a été approuvé et activé par l'administration.
+        /// </summary>
+        /// <param name="email">Adresse e-mail de l'administrateur d'entreprise.</param>
+        /// <param name="firstName">Prénom du destinataire.</param>
+        /// <param name="companyName">Nom de l'entreprise approuvée.</param>
+        /// <returns>True si l'e-mail a été envoyé, sinon false.</returns>
         public async Task<bool> SendAccountActivationAsync(string email, string firstName, string companyName)
         {
             var loginUrl = _settings.ConfirmationUrl?.Replace("/confirm-email", "/connexion") ?? "http://localhost:3010/connexion";
@@ -334,6 +437,15 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie une invitation à un test de présélection (quiz) sous forme d'e-mail personnalisé au candidat.
+        /// </summary>
+        /// <param name="candidateEmail">Adresse e-mail du candidat.</param>
+        /// <param name="candidateName">Nom complet du candidat.</param>
+        /// <param name="jobTitle">Titre du poste concerné.</param>
+        /// <param name="quizUrl">URL unique pour passer le test/quiz.</param>
+        /// <param name="companyName">Nom de l'entreprise recruteuse.</param>
+        /// <returns>True si l'invitation a été envoyée avec succès, sinon false.</returns>
         public async Task<bool> SendQuizInvitationAsync(string candidateEmail, string candidateName, string jobTitle, string quizUrl, string companyName)
         {
             var body = $@"
@@ -387,6 +499,15 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie un e-mail de refus personnalisé au candidat si sa candidature n'est pas retenue.
+        /// </summary>
+        /// <param name="candidateEmail">Adresse e-mail du candidat.</param>
+        /// <param name="candidateName">Nom complet du candidat.</param>
+        /// <param name="jobTitle">Titre du poste.</param>
+        /// <param name="companyName">Nom de l'entreprise.</param>
+        /// <param name="reason">Raison optionnelle expliquant le refus.</param>
+        /// <returns>True si le message de refus a été envoyé, sinon false.</returns>
         public async Task<bool> SendRejectionEmailAsync(string candidateEmail, string candidateName, string jobTitle, string companyName, string? reason = null)
         {
             var body = $@"
@@ -425,6 +546,14 @@ namespace Infrastructure.Services
             return await SendAsync(message).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Envoie un e-mail informant le candidat que sa candidature a été retenue/shortlistée pour les étapes suivantes.
+        /// </summary>
+        /// <param name="candidateEmail">Adresse e-mail du candidat.</param>
+        /// <param name="candidateName">Nom complet du candidat.</param>
+        /// <param name="jobTitle">Titre du poste.</param>
+        /// <param name="companyName">Nom de l'entreprise.</param>
+        /// <returns>True si le message a été envoyé avec succès, sinon false.</returns>
         public async Task<bool> SendShortlistedEmailAsync(string candidateEmail, string candidateName, string jobTitle, string companyName)
         {
             var body = $@"
@@ -459,6 +588,18 @@ namespace Infrastructure.Services
             var message = CreateMessage(candidateEmail, $"Félicitations : Votre candidature chez {companyName} progresse !", body, candidateName);
             return await SendAsync(message).ConfigureAwait(false);
         }
+
+        /// <summary>
+        /// Envoie une invitation d'entretien contenant un fichier d'invitation calendrier standard (ICS) en pièce jointe.
+        /// </summary>
+        /// <param name="candidateEmail">Adresse e-mail du candidat.</param>
+        /// <param name="candidateName">Nom complet du candidat.</param>
+        /// <param name="subject">Sujet de l'e-mail.</param>
+        /// <param name="htmlBody">Corps HTML du message.</param>
+        /// <param name="scheduledAt">Date et heure planifiée pour l'entretien.</param>
+        /// <param name="durationMinutes">Durée de l'entretien en minutes.</param>
+        /// <param name="location">Lieu ou lien de réunion virtuelle.</param>
+        /// <returns>True si le message et son invitation calendrier ont été envoyés, sinon false.</returns>
         public async Task<bool> SendInterviewInvitationWithCalendarAsync(string candidateEmail, string candidateName, string subject, string htmlBody, DateTime scheduledAt, int durationMinutes, string location)
         {
             var message = CreateMessage(candidateEmail, subject, htmlBody, candidateName);
@@ -491,8 +632,7 @@ END:VCALENDAR";
                 ContentTransferEncoding = ContentEncoding.Base64,
                 FileName = "invite.ics"
             };
-            calendarPart.ContentType.Parameters.Add("method", "REQUEST");
-            calendarPart.ContentType.Parameters.Add("name", "invite.ics");
+            calendarPart.ContentType.Parameters["method"] = "REQUEST";
 
             bodyBuilder.Attachments.Add(calendarPart);
             message.Body = bodyBuilder.ToMessageBody();

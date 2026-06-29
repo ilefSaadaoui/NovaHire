@@ -325,7 +325,7 @@
                 <button v-if="currentStep > 0" class="btn-premium btn-secondary" @click="currentStep--">{{ $t('common.previous') }}</button>
                 <div style="flex:1"></div>
                 <button v-if="currentStep < 2" class="btn-luxury primary" @click="handleNextStep">{{ $t('common.next') }}</button>
-                <button v-else class="btn-luxury primary" @click="publishOffer" :disabled="isLoading">
+                <button v-else class="btn-luxury primary" @click="publishOffer" :disabled="isLoading || isSubmitting">
                   {{ isEdit ? $t('common.save') : (form.status === 'Published' ? $t('createOffer.publish.status.publish') : $t('createOffer.publish.status.draft')) }}
                 </button>
               </div>
@@ -399,6 +399,7 @@ export default {
       isCompanyOwner,
       currentStep: 0,
       isLoading: false,
+      isSubmitting: false,
       isGenerating: false,
       newSkill: '',
       jobOffer: null,
@@ -533,6 +534,7 @@ export default {
       return [
         { value: 'FullTime', label: this.$t('createOffer.general.types.cdi') },
         { value: 'Contract', label: this.$t('createOffer.general.types.cdd') },
+        { value: 'PartTime', label: this.$t('createOffer.general.types.partTime') },
         { value: 'Freelance', label: this.$t('createOffer.general.types.freelance') },
         { value: 'Internship', label: this.$t('createOffer.general.types.stage') }
       ]
@@ -623,6 +625,9 @@ export default {
       this.currentStep++
     },
     async publishOffer() {
+      // Guard against double-click / concurrent submissions
+      if (this.isSubmitting) return
+
       this.validateField('deadline')
       if (this.errors.deadline) {
         this.scrollToFirstError()
@@ -634,6 +639,7 @@ export default {
         return
       }
 
+      this.isSubmitting = true
       this.isLoading = true
       try {
         const payload = { ...this.form }
@@ -652,6 +658,11 @@ export default {
         const maxVal = parseInt(payload.salaryMax)
         payload.salaryMin = !isNaN(minVal) ? minVal : null
         payload.salaryMax = !isNaN(maxVal) ? maxVal : null
+
+        const threshold = parseInt(payload.autoRejectThreshold, 10)
+        payload.autoRejectThreshold = Number.isNaN(threshold) || threshold <= 0
+          ? 0
+          : Math.min(80, threshold)
 
         // Map formFields to FormConfig object (Sync with backend DTO)
         const formConfig = {}
@@ -689,8 +700,10 @@ export default {
         }
       } catch (err) {
         console.error('Erreur publication:', err)
+        useToastStore().show("Erreur lors de la création de l'offre", 'error')
       } finally {
         this.isLoading = false
+        this.isSubmitting = false
       }
     },
     getPublicLink() {
@@ -729,14 +742,15 @@ export default {
 .creation-grid-expert {
   display: grid;
   grid-template-columns: 1fr 380px;
-  gap: 32px;
+  gap: 24px;
   align-items: flex-start;
 }
 
 .r-stepper {
   display: flex;
   gap: 16px;
-  margin-bottom: 40px;
+  margin-bottom: 24px;
+  justify-content: center;
 }
 
 .r-step-pill {
@@ -826,12 +840,12 @@ export default {
 .r-step-pill.active .step-label { color: var(--accent-contrast); }
 
 /* FORM SECTIONS */
-.form-inner-card { padding: 40px; }
-.section-header-premium { margin-bottom: 32px; border-bottom: 1px solid var(--r-border); padding-bottom: 20px; }
-.section-header-premium h3 { font-size: 20px; font-weight: 900; color: var(--r-text-main); margin: 0; }
+.form-inner-card { padding: 24px 32px; max-width: 850px; margin: 0 auto; }
+.section-header-premium { margin-bottom: 20px; border-bottom: 1px solid var(--r-border); padding-bottom: 16px; }
+.section-header-premium h3 { font-size: 18px; font-weight: 900; color: var(--r-text-main); margin: 0; }
 
 .form-section-premium { }
-.section-title-premium { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.section-title-premium { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .section-title-premium .num { 
   font-size: 12px; font-weight: 900; color: var(--accent-color); 
   background: var(--accent-soft); width: 24px; height: 24px; 
@@ -839,12 +853,12 @@ export default {
 }
 .section-title-premium h4 { font-size: 16px; font-weight: 800; color: var(--r-text-main); margin: 0; }
 
-.r-form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-.mt-20 { margin-top: 20px; }
-.mt-32 { margin-top: 32px; }
+.r-form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.mt-20 { margin-top: 16px; }
+.mt-32 { margin-top: 24px; }
 
 /* INPUT GROUPS */
-.r-input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.r-input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .r-input-group.full { grid-column: span 2; }
 .r-input-group label { font-size: 13px; font-weight: 700; color: var(--r-text-sub); }
 .r-input-group input, .r-input-group select, .r-input-group textarea, .r-input-group input[type="date"] {

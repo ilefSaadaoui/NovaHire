@@ -128,13 +128,22 @@ export default {
     }
   },
   created() {
-    this.token = this.$route.query.token || ''
-    this.email = this.$route.query.email || ''
+    this.token = this.parseQueryParam(this.$route.query.token)
+    this.email = this.parseQueryParam(this.$route.query.email)
     if (!this.token || !this.email) {
       this.errorMessage = 'Lien de réinitialisation invalide ou manquant.'
     }
   },
   methods: {
+    parseQueryParam(value) {
+      if (!value) return ''
+      const raw = Array.isArray(value) ? value[0] : value
+      try {
+        return decodeURIComponent(String(raw).trim()).replace(/ /g, '+')
+      } catch {
+        return String(raw).trim().replace(/ /g, '+')
+      }
+    },
     async handleResetPassword() {
       if (this.password !== this.confirmPassword) {
         this.errorMessage = 'Les mots de passe ne correspondent pas.'
@@ -148,6 +157,7 @@ export default {
       this.errorMessage = ''
       try {
         await authService.resetPassword(this.email, this.token, this.password, this.confirmPassword)
+        localStorage.removeItem('rememberedPassword')
         this.isCompleted = true
       } catch (error) {
         this.errorMessage = error.message || 'Échec de la réinitialisation.'
@@ -278,5 +288,58 @@ export default {
 @media (max-width: 960px) {
   .auth-layout { grid-template-columns: 1fr; max-width: 480px; }
   .welcome-panel { display: none; }
+}
+
+/* ─── LIGHT MODE OVERRIDES ─── */
+:global(body:not(.dark-mode) .auth-celestial) {
+  background: #f4f7fe !important;
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .welcome-desc) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .trust-item) {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .trust-text strong) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .trust-text span) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .glass-panel) {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+}
+:global(body:not(.dark-mode) .btn-back) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .btn-back:hover) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .card-header h2) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .card-header p) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .field label) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .input-shell input) {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .input-shell svg) {
+  color: rgba(0, 0, 0, 0.4);
+}
+:global(body:not(.dark-mode) .success-state h3) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .success-state p) {
+  color: #475569;
 }
 </style>

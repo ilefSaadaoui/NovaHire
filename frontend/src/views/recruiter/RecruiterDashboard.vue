@@ -24,9 +24,7 @@
               {{ p.label }}
             </button>
           </div>
-          <div class="header-action-group" style="display: flex; gap: 12px; margin-left: 24px;">
-            <NotificationBell />
-          </div>
+
         </div>
       </header>
 
@@ -306,11 +304,6 @@
         </template>
       </div>
     </main>
-    
-    <DailyBriefingModal
-      :show="showBriefing"
-      @close="showBriefing = false"
-    />
   </div>
 </template>
 
@@ -319,16 +312,15 @@ import { useAuthStore } from '@/stores/authStore'
 import { useThemeStore } from '@/stores/themeStore'
 import Sidebar from '@/components/layout/Sidebar.vue'
 
-import NotificationBell from '@/components/common/NotificationBell.vue'
+
 import { onMounted, onUnmounted } from 'vue'
 import { useToastStore } from '@/stores/toastStore'
 import api from '@/api/axios'
-import DailyBriefingModal from '@/components/superadmin/modals/DailyBriefingModal.vue'
 
 
 export default {
   name: 'RecruiterDashboard',
-  components: { Sidebar, NotificationBell, DailyBriefingModal },
+  components: { Sidebar },
   data() {
     const authStore = useAuthStore()
     const toastStore = useToastStore()
@@ -372,21 +364,12 @@ export default {
       },
       // Animation State
       animatedGreeting: '',
-      rawGreeting: '',
-      showBriefing: false
+      rawGreeting: ''
     }
   },
   async mounted() {
     await this.fetchDashboard()
     this.initProfessionalGreeting()
-
-    // Show briefing if first time in session
-    if (!sessionStorage.getItem('briefing_shown')) {
-      setTimeout(() => {
-        this.showBriefing = true
-        sessionStorage.setItem('briefing_shown', 'true')
-      }, 1500)
-    }
   },
   watch: {
     async globalPeriod(newPeriod) {

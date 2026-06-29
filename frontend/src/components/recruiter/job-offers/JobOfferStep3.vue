@@ -123,6 +123,54 @@
       </div>
     </div>
 
+    <!-- Section: Filtre Automatique IA -->
+    <div class="form-section-premium mt-40 lux-shadow">
+      <div class="section-title-lux">
+        <div class="title-badge">
+          <span class="num">⚡</span>
+          <div class="icon-wrap-lux">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+        </div>
+        <div class="title-text-lux">
+          <h4>Filtre Automatique IA</h4>
+          <p>Rejet automatique sous un seuil de score IA (0 = désactivé)</p>
+        </div>
+      </div>
+
+      <div class="ai-intelligence-card-lux reject-card">
+        <div class="wc-header">
+          <span class="wc-icon" style="color: #ef4444">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          </span>
+          <div class="wc-text">
+            <label>Seuil de rejet automatique</label>
+            <div class="wc-bar-wrap">
+              <div class="wc-bar-fill" :style="{ width: form.autoRejectThreshold + '%', background: '#ef4444' }"></div>
+            </div>
+          </div>
+          <div class="wc-value" :style="{ color: form.autoRejectThreshold > 0 ? '#ef4444' : 'var(--r-text-sub)' }">
+            {{ form.autoRejectThreshold }}%
+          </div>
+        </div>
+        <input
+          type="range"
+          :value="form.autoRejectThreshold"
+          @input="$emit('update:form', { ...form, autoRejectThreshold: parseInt($event.target.value) })"
+          min="0" max="80" step="5"
+          class="premium-range-lux reject-range"
+        >
+        <div v-if="form.autoRejectThreshold > 0" class="auto-reject-hint">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Tout candidat avec un score IA &lt; {{ form.autoRejectThreshold }}% sera rejeté automatiquement.
+        </div>
+        <div v-else class="auto-reject-hint inactive-hint">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Filtre désactivé — tous les candidats seront acceptés pour analyse.
+        </div>
+      </div>
+    </div>
+
     <!-- Section: Workflow -->
     <div class="form-section-premium mt-40 lux-shadow">
       <div class="section-title-lux">
@@ -142,11 +190,15 @@
           <label>Date de clôture</label>
           <div class="date-input-lux-wrap">
             <input 
-              type="text" 
-              v-model="localDateDisplay" 
+              type="text"
+              :value="localDateDisplay"
               @input="handleDateInput"
+              @blur="handleDateBlur"
               placeholder="jj-mm-aaaa"
               class="expert-date-lux"
+              :class="{ 'date-invalid': dateError }"
+              maxlength="10"
+              autocomplete="off"
             >
             <input 
               ref="datePickerInput"
@@ -169,7 +221,8 @@
               </svg>
             </button>
           </div>
-          <span v-if="errors.deadline" class="error-msg">{{ errors.deadline }}</span>
+          <span v-if="dateError" class="error-msg date-err">{{ dateError }}</span>
+          <span v-else-if="errors.deadline" class="error-msg">{{ errors.deadline }}</span>
         </div>
         <div class="r-input-group">
           <label>Visibilité de l'offre</label>
@@ -209,6 +262,20 @@ const formatDateToDisplay = (dateStr) => {
   return dateStr
 }
 
+const isValidDate = (day, month, year) => {
+  if (year < 1900 || year > 2100) return false
+  if (month < 1 || month > 12) return false
+  if (day < 1) return false
+  const daysInMonth = new Date(year, month, 0).getDate()
+  if (day > daysInMonth) return false
+  // Date must be in the future
+  const inputDate = new Date(year, month - 1, day)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (inputDate < today) return 'future'
+  return true
+}
+
 const formatDateToISO = (dateStr) => {
   if (!dateStr) return ''
   const parts = dateStr.split('-')
@@ -222,20 +289,76 @@ const formatDateToISO = (dateStr) => {
 const emit = defineEmits(['update:form', 'validate'])
 const datePickerInput = ref(null)
 const localDateDisplay = ref(formatDateToDisplay(props.form.deadline))
+const dateError = ref('')
 
 // Sync display if prop changes from outside
 watch(() => props.form.deadline, (newVal) => {
   localDateDisplay.value = formatDateToDisplay(newVal)
 })
 
-
 const handleDateInput = (event) => {
-  localDateDisplay.value = event.target.value
-  const isoValue = formatDateToISO(localDateDisplay.value)
-  // Only update parent if it's a valid date or empty
-  if (isoValue || !localDateDisplay.value) {
-    emit('update:form', { ...props.form, deadline: isoValue })
-    emit('validate', 'deadline')
+  let raw = event.target.value
+
+  // If user is deleting, just allow it without auto-formatting
+  if (raw.length < localDateDisplay.value.length) {
+    localDateDisplay.value = raw
+    event.target.value = raw
+    dateError.value = ''
+    if (raw.length === 0) emit('update:form', { ...props.form, deadline: '' })
+    return
+  }
+
+  let digits = raw.replace(/[^\d]/g, '')
+
+  // Smart Masking - Day
+  if (digits.length === 1 && parseInt(digits[0]) > 3) digits = '0' + digits
+  if (digits.length >= 2) {
+    let day = parseInt(digits.slice(0, 2))
+    if (day > 31) digits = '31' + digits.slice(2)
+    if (day === 0) digits = '01' + digits.slice(2)
+  }
+
+  // Smart Masking - Month
+  if (digits.length === 3 && parseInt(digits[2]) > 1) digits = digits.slice(0, 2) + '0' + digits.slice(2)
+  if (digits.length >= 4) {
+    let month = parseInt(digits.slice(2, 4))
+    if (month > 12) digits = digits.slice(0, 2) + '12' + digits.slice(4)
+    if (month === 0) digits = digits.slice(0, 2) + '01' + digits.slice(4)
+  }
+
+  // Re-format with dashes
+  let formatted = digits
+  if (digits.length > 2) formatted = digits.slice(0, 2) + '-' + digits.slice(2)
+  if (digits.length > 4) formatted = digits.slice(0, 2) + '-' + digits.slice(2, 4) + '-' + digits.slice(4, 8)
+
+  localDateDisplay.value = formatted
+  event.target.value = formatted
+  dateError.value = ''
+
+  // Validate only when fully typed
+  if (formatted.length === 10) {
+    const parts = formatted.split('-')
+    if (parts.length === 3) {
+      const [d, m, y] = parts.map(Number)
+      const valid = isValidDate(d, m, y)
+      if (valid === 'future') {
+        dateError.value = 'La date doit être dans le futur'
+        return
+      } else if (valid !== true) {
+        dateError.value = 'Date invalide (ex: 31-12-2025)'
+        return
+      }
+      const isoValue = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+      emit('update:form', { ...props.form, deadline: isoValue })
+      emit('validate', 'deadline')
+    }
+  }
+}
+
+const handleDateBlur = () => {
+  if (!localDateDisplay.value) return
+  if (localDateDisplay.value.length < 10) {
+    dateError.value = 'Format attendu : jj-mm-aaaa'
   }
 }
 
@@ -340,7 +463,7 @@ const resetWeights = () => {
   position: relative; overflow: hidden;
 }
 .config-card-lux:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 15px 35px -10px rgba(0,0,0,0.1); }
-.config-card-lux.is-disabled { opacity: 0.6; grayscale: 0.8; }
+.config-card-lux.is-disabled { opacity: 0.8; filter: grayscale(1); }
 .config-card-lux.is-required::before {
   content: "OBLIGATOIRE"; position: absolute; top: 12px; right: -25px; 
   background: var(--accent); color: white; font-size: 9px; font-weight: 900;
@@ -462,6 +585,11 @@ input:checked + .t-slider::before { transform: translateX(16px); }
   box-shadow: 0 10px 25px -5px var(--accent-soft);
   outline: none;
 }
+.expert-date-lux.date-invalid {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+.date-err { color: #ef4444; font-size: 12px; font-weight: 600; margin-top: 6px; display: block; }
 
 .date-picker-hidden {
   position: absolute;
@@ -497,6 +625,26 @@ input:checked + .t-slider::before { transform: translateX(16px); }
 .status-select-lux-wrap::after { content: '▼'; position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--accent); pointer-events: none; }
 
 .mt-40 { margin-top: 40px; }
+
+/* Auto-Reject Threshold */
+.reject-card { padding: 28px; }
+.reject-range { --accent-col: #ef4444; }
+.reject-range::-webkit-slider-thumb { background: #ef4444 !important; }
+
+.auto-reject-hint {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 16px; padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px; color: #dc2626;
+  font-size: 12px; font-weight: 600;
+}
+.inactive-hint {
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
 @media (max-width: 900px) {
   .weights-grid-lux, .r-form-row-lux { grid-template-columns: 1fr; }
 }

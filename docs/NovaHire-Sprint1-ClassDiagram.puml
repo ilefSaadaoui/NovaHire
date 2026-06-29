@@ -1,0 +1,74 @@
+@startuml NovaHire-Sprint1-ClassDiagram
+title Sprint 1 - Authentification et gestion multi-entreprises\nDiagramme de classes (vue metier) - UML 2.5.1
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+enum StatutSociete {
+  En_attente
+  Validee
+  Refusee
+  Suspendue
+}
+
+enum RoleCollaborateur {
+  Admin_plateforme
+  Admin_entreprise
+  Recruteur
+}
+
+class Societe {
+  -nom : String
+  -secteur : String
+  -emailContact : String
+  -statut : StatutSociete
+  -dateCreation : Date
+  __
+  +inscrire() : void
+  +estValidee() : Boolean
+}
+
+class Collaborateur {
+  -nom : String
+  -prenom : String
+  -email : String
+  -motDePasseHash : String
+  -role : RoleCollaborateur
+  -actif : Boolean
+  __
+  +seConnecter(motDePasse) : Boolean
+  +changerMotDePasse() : void
+  +mettreAJourProfil() : void
+}
+
+class Departement {
+  -nom : String
+  -description : String
+  __
+  +creer() : void
+  +affecterCollaborateur() : void
+}
+
+class AdminEntreprise {
+  -email : String
+  __
+  +inviterRecruteur(email) : void
+  +gererEquipe() : void
+}
+
+Societe "1" *-- "0..*" Departement : contient
+Societe "1" o-- "0..*" Collaborateur : emploie
+Departement "1" o-- "0..*" Collaborateur : regroupe
+AdminEntreprise --|> Collaborateur
+
+Societe ..> StatutSociete
+Collaborateur ..> RoleCollaborateur
+
+note bottom of Societe
+  Inscription : statut **En attente**
+  Validation au Sprint 4
+end note
+
+@enduml

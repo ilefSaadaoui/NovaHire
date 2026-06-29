@@ -18,38 +18,38 @@
          <div class="header-actions">
             <button class="btn-premium btn-secondary" @click="window.print()">
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-               Imprimer
+               {{ $t('common.print') }}
             </button>
          </div>
       </header>
 
       <div v-if="loading" class="dossier-loading">
          <div class="nebula-spinner"></div>
-         <p>Génération du dossier stratégique...</p>
+         <p>{{ $t('reports.generatingDossier') }}</p>
       </div>
 
       <div v-else class="page-body dossier-body stagger-reveal">
          <!-- ROW 1: RÉSUMÉ + PIPELINE -->
          <div class="dossier-row top-row">
             <div class="admin-glass-card executive-summary">
-               <div class="summary-head">
+                  <div class="summary-head">
                   <div class="sh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
-                  <h3>Résumé Stratégique</h3>
+                  <h3>{{ $t('reports.strategicSummary') }}</h3>
                </div>
                <div class="summary-content">
-                  <p>L'offre <strong>{{ jobTitle }}</strong> a reçu <strong>{{ totalApplications }}</strong> candidature(s) dont <strong>{{ analyzedCount }}</strong> analysée(s) par l'IA.</p>
+                  <p v-html="$t('reports.summaryText', { jobTitle: jobTitle })"></p>
                   <div class="narrative-kpis">
                      <div class="nk-item">
                         <span class="nk-val">{{ stats.conversionRate }}%</span>
-                        <span class="nk-label">Taux de Conversion</span>
+                        <span class="nk-label">{{ $t('reports.conversionRate') }}</span>
                      </div>
                      <div class="nk-item">
                         <span class="nk-val">{{ stats.avgScore }}%</span>
-                        <span class="nk-label">Score Moyen IA</span>
+                        <span class="nk-label">{{ $t('reports.matchQuality') }}</span>
                      </div>
                      <div class="nk-item">
                         <span class="nk-val">{{ analyzedCount }}</span>
-                        <span class="nk-label">Analyses IA</span>
+                        <span class="nk-label">{{ $t('dashboard.recruiter.aiScored') }}</span>
                      </div>
                   </div>
                   <div class="ai-logic-voice">
@@ -62,7 +62,7 @@
             <div class="admin-glass-card pipeline-velocity">
                <div class="summary-head">
                   <div class="sh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-                  <h3>Statuts du Pipeline</h3>
+                  <h3>{{ $t('reports.pipelineVelocity') }}</h3>
                </div>
                <div class="velocity-viz">
                   <div v-for="step in pipelineSteps" :key="step.name" class="v-step">
@@ -74,7 +74,7 @@
                         <div class="vs-fill" :style="{ width: step.percentage + '%', background: step.color }"></div>
                      </div>
                   </div>
-                  <div v-if="!pipelineSteps.length" style="color:var(--r-text-sub);text-align:center;padding:20px">Aucune candidature</div>
+                  <div v-if="!pipelineSteps.length" style="color:var(--r-text-sub);text-align:center;padding:20px">{{ $t('pipeline.empty') }}</div>
                </div>
             </div>
          </div>
@@ -83,7 +83,7 @@
          <div class="dossier-row mid-row">
             <div class="admin-glass-card skills-heatmap">
                <div class="summary-head">
-                  <h3 class="side-title">Top Compétences Identifiées</h3>
+                  <h3 class="side-title">{{ $t('reports.skillsHeatmap') }}</h3>
                </div>
                <div class="heatmap-grid">
                   <div v-for="skill in skillsData" :key="skill.name" class="skill-heat-item">
@@ -93,13 +93,13 @@
                      </div>
                      <div class="sh-count">{{ skill.count }} candidat(s)</div>
                   </div>
-                  <div v-if="!skillsData.length" style="color:var(--r-text-sub);text-align:center;padding:20px">Aucune compétence identifiée (analysez d'abord les CVs)</div>
+                  <div v-if="!skillsData.length" style="color:var(--r-text-sub);text-align:center;padding:20px">{{ $t('reports.noSkills') }}</div>
                </div>
             </div>
 
             <div class="admin-glass-card top-talents">
                <div class="summary-head">
-                  <h3 class="side-title">Top 3 Meilleurs Profils</h3>
+                  <h3 class="side-title">{{ $t('reports.topTalents') }}</h3>
                </div>
                <div class="talents-list">
                   <div v-for="(t, i) in topTalents" :key="t.id" class="talent-card-mini">
@@ -112,10 +112,10 @@
                         {{ t.score }}%
                      </div>
                   </div>
-                  <div v-if="!topTalents.length" style="color:var(--r-text-sub);text-align:center;padding:20px">Aucun profil analysé par l'IA</div>
+                  <div v-if="!topTalents.length" style="color:var(--r-text-sub);text-align:center;padding:20px">{{ $t('reports.noTopTalents') }}</div>
                </div>
                <button class="btn-premium btn-secondary w-full mt-20" @click="$router.push('/applications')">
-                  Voir tout le vivier
+                  {{ $t('reports.viewAllVivier') }}
                </button>
             </div>
          </div>
@@ -123,9 +123,9 @@
          <!-- ROW 3: DISTRIBUTION SCORES -->
          <div class="dossier-row bottom-row">
             <div class="admin-glass-card wide sourcing-roi">
-               <div class="summary-head">
+                  <div class="summary-head">
                   <div class="sh-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
-                  <h3 class="side-title">Distribution des Scores IA</h3>
+                  <h3 class="side-title">{{ $t('reports.matchQuality') }}</h3>
                </div>
                <div class="roi-grid">
                   <div v-for="range in scoreRanges" :key="range.label" class="roi-card">
@@ -150,8 +150,8 @@
                <div class="cert-stamp">
                   <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--a-accent)" stroke-width="2" stroke-dasharray="2 4"/><path d="M50 20 L60 40 L80 40 L65 55 L70 75 L50 65 L30 75 L35 55 L20 40 L40 40 Z" fill="var(--a-accent)"/></svg>
                </div>
-               <div class="cert-text">
-                  <p>Généré le {{ new Date().toLocaleDateString('fr-FR') }} par NovaHire Intelligence</p>
+                  <div class="cert-text">
+                  <p>{{ $t('reports.generatedOn', { date: new Date().toLocaleDateString(i18nLocale()) }) }}</p>
                   <p class="cert-id-text">ID: NH-REPORT-{{ $route.params.id }}-ALPHA</p>
                </div>
             </div>

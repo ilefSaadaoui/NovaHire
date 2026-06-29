@@ -1,9 +1,14 @@
 import { defineStore } from 'pinia'
+import { useAuthStore } from './authStore'
 
 export const useThemeStore = defineStore('theme', {
-    state: () => ({
-        isDark: localStorage.getItem('theme') === 'dark'
-    }),
+    state: () => {
+        const stored = localStorage.getItem('theme')
+        return {
+            // Dark by default on first visit (matches current public pages look)
+            isDark: stored === null ? true : stored === 'dark'
+        }
+    },
     actions: {
         toggleTheme() {
             this.isDark = !this.isDark
@@ -12,12 +17,16 @@ export const useThemeStore = defineStore('theme', {
             el.classList.toggle('dark-mode', this.isDark)
             body.classList.toggle('dark-mode', this.isDark)
             localStorage.setItem('theme', this.isDark ? 'dark' : 'light')
+
+            // Apply theme colors dynamically
+            const authStore = useAuthStore()
+            authStore.applyTheme()
         },
         initTheme() {
-            if (this.isDark) {
-                document.documentElement.classList.add('dark-mode')
-                document.body.classList.add('dark-mode')
-            }
+            const el = document.documentElement
+            const body = document.body
+            el.classList.toggle('dark-mode', this.isDark)
+            body.classList.toggle('dark-mode', this.isDark)
         }
     }
 })

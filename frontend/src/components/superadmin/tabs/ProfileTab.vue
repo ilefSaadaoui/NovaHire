@@ -58,7 +58,7 @@
               <label>Changer le mot de passe</label>
               <div class="input-wrap">
                 <input v-model="profileForm.password" class="modern-input" type="password" placeholder="Laisser vide pour ne pas modifier" />
-                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3y-1.5z"/></svg>
+                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-7.5 1.5z"/></svg>
               </div>
               <p class="field-hint">Utilisez un mot de passe complexe pour protéger l'accès à la plateforme.</p>
             </div>
@@ -257,7 +257,7 @@ const processAvatarFile = async (file) => {
     })
     
     // Update the avatarUrl in the form
-    const apiBase = api.defaults.baseURL || 'http://localhost:5000/api'
+    const apiBase = api.defaults.baseURL || '/api'
     const avatarUrl = res.data.avatarUrl?.startsWith('http')
       ? res.data.avatarUrl
       : `${apiBase.replace('/api', '')}${res.data.avatarUrl}`

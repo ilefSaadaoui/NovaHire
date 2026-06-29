@@ -146,6 +146,7 @@
 import { ref, watch } from 'vue';
 import { Zap, X, Loader2 } from 'lucide-vue-next';
 import api from '@/api/axios';
+import { useToastStore } from '@/stores/toastStore';
 
 const props = defineProps({
   isOpen: Boolean,
@@ -167,12 +168,17 @@ const axes = [
 
 const fetchComparison = async () => {
   if (!props.candidateIds || props.candidateIds.length === 0) return;
+  const ids = props.candidateIds.slice(0, 2);
+  if (ids.length < 2) return;
   loading.value = true;
+  comparisonData.value = null;
   try {
-    const res = await api.get(`/Recruiter/applications/compare?ids=${props.candidateIds.join(',')}`);
+    const res = await api.get(`/Recruiter/applications/compare?ids=${ids.join(',')}`);
     comparisonData.value = res.data;
   } catch (error) {
-    console.error(error);
+    const msg = error.response?.data?.message || 'Impossible de charger la comparaison. Lancez l\'analyse IA sur les deux candidats.';
+    useToastStore().show(msg, 'error');
+    close();
   } finally {
     loading.value = false;
   }

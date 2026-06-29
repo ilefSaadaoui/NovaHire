@@ -11,14 +11,8 @@ export const useLangStore = defineStore('lang', {
             localStorage.setItem('appLang', lang)
             i18n.global.locale.value = lang
 
-            // Handle RTL for Arabic
-            if (lang === 'ar') {
-                document.documentElement.dir = 'rtl'
-                document.documentElement.lang = 'ar'
-            } else {
-                document.documentElement.dir = 'ltr'
-                document.documentElement.lang = lang
-            }
+            document.documentElement.dir = 'ltr'
+            document.documentElement.lang = lang
         },
         initLanguage() {
             this.setLanguage(this.currentLang)

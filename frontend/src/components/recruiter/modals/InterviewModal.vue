@@ -25,24 +25,32 @@
               <div class="form-group">
                 <label><CalendarIcon :size="14" /> Date prévue</label>
                 <div class="input-wrap">
-                  <input type="date" :value="form?.date" @change="handleDateTimeChange('date', $event.target.value)" />
+                  <input
+                    type="date"
+                    v-model="localForm.date"
+                    @input="updateField('date', localForm.date)"
+                  />
                 </div>
               </div>
               <div class="form-group">
                 <label><Clock :size="14" /> Heure prévue</label>
                 <div class="input-wrap">
-                  <input type="time" :value="form?.time" @change="handleDateTimeChange('time', $event.target.value)" />
+                  <input
+                    type="time"
+                    v-model="localForm.time"
+                    @input="updateField('time', localForm.time)"
+                  />
                 </div>
               </div>
             </div>
             <div class="form-group mt-16">
               <label><Video :size="14" /> Format de l'entretien</label>
               <div class="input-wrap custom-select-wrapper">
-                <PremiumSelect 
-                  :modelValue="form?.type" 
-                  @update:modelValue="handleTypeChange"
-                  :options="typeOptions" 
-                />
+                <select v-model="localForm.type" @change="handleTypeChange($event.target.value)" style="width:100%; padding:12px; border:1px solid var(--r-border); border-radius:8px; background: var(--r-main-bg); color: var(--r-text-main); outline:none;">
+                  <option value="visio">Visio / Télétravail</option>
+                  <option value="phone">Appel Téléphonique</option>
+                  <option value="onsite">En Personne (Bureau)</option>
+                </select>
               </div>
             </div>
           </div>
@@ -68,7 +76,7 @@
 
         <div class="modal-footer">
           <button class="action-btn action-cancel" @click="$emit('close')">Annuler</button>
-          <button class="action-btn action-main" @click="$emit('save')" :disabled="!form?.date || !form?.time || loading">
+          <button class="action-btn action-main" @click="$emit('save')" :disabled="isSubmitDisabled">
             <Send :size="16" stroke-width="2.5" v-if="!loading" />
             <span style="text-transform: uppercase; letter-spacing: 1px;">{{ loading ? 'ENVOI...' : 'ENVOYER L\'INVITATION' }}</span>
           </button>
@@ -79,24 +87,115 @@
 </template>
 
 <script setup>
+import { reactive, watch, computed } from 'vue'
 import { Calendar as CalendarIcon, Clock, Video, Mail, Send, X } from 'lucide-vue-next'
-import PremiumSelect from '@/components/common/PremiumSelect.vue'
 
 const props = defineProps({
-  form: Object,
+  form: {
+    type: Object,
+    required: true
+  },
   loading: Boolean
 })
 
 const emit = defineEmits(['close', 'save', 'generate-template', 'update:form'])
 
-const typeOptions = [
-  { value: 'visio', label: 'Visio / Télétravail' },
-  { value: 'phone', label: 'Appel Téléphonique' },
-  { value: 'onsite', label: 'En Personne (Bureau)' }
-]
+const formatDateForInput = (value) => {
+  if (!value) return ''
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value
+  }
+  let date = value
+  if (!(date instanceof Date)) {
+    date = parseDateInput(value)
+  }
+  if (!date) return ''
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const formatTimeForInput = (value) => {
+  if (!value) return ''
+  const match = String(value).match(/^(\d{1,2}):(\d{1,2})$/)
+  if (!match) return ''
+  const hours = String(Number(match[1])).padStart(2, '0')
+  const minutes = String(Number(match[2])).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+const localForm = reactive({
+  date: formatDateForInput(props.form?.date),
+  time: formatTimeForInput(props.form?.time),
+  type: props.form?.type || 'visio',
+  subject: props.form?.subject || '',
+  message: props.form?.message || ''
+})
+
+watch(
+  () => props.form?.subject,
+  (next) => {
+    if (next !== undefined && next !== localForm.subject) {
+      localForm.subject = next || ''
+    }
+  }
+)
+
+watch(
+  () => props.form?.message,
+  (next) => {
+    if (next !== undefined && next !== localForm.message) {
+      localForm.message = next || ''
+    }
+  }
+)
 
 const updateField = (field, value) => {
-  emit('update:form', { ...props.form, [field]: value })
+  localForm[field] = value
+  emit('update:form', { ...localForm })
+  if (field === 'date' || field === 'time') {
+    emit('generate-template')
+  }
+}
+
+function parseDateInput(value) {
+  if (!value) return null
+  const normalized = value.trim()
+  const frMatch = normalized.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/)
+  if (frMatch) {
+    const day = Number(frMatch[1])
+    const month = Number(frMatch[2])
+    let year = Number(frMatch[3])
+    if (year < 100) year += 2000
+    const date = new Date(year, month - 1, day)
+    if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+      return date
+    }
+  }
+  const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoMatch) {
+    const year = Number(isoMatch[1])
+    const month = Number(isoMatch[2])
+    const day = Number(isoMatch[3])
+    const date = new Date(year, month - 1, day)
+    if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+      return date
+    }
+  }
+  const parsed = new Date(normalized)
+  return isNaN(parsed.getTime()) ? null : parsed
+}
+
+const formatLocalizedDate = (value) => {
+  const date = typeof value === 'string' ? parseDateInput(value) : value
+  if (!date) return value
+  return date.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+const formatPayloadDate = (value) => {
+  const date = parseDateInput(value)
+  return date ? date.toISOString().split('T')[0] : value
 }
 
 const handleTypeChange = (val) => {
@@ -104,10 +203,7 @@ const handleTypeChange = (val) => {
   emit('generate-template')
 }
 
-const handleDateTimeChange = (field, value) => {
-  updateField(field, value)
-  emit('generate-template')
-}
+const isSubmitDisabled = computed(() => !localForm.date || !localForm.time || props.loading)
 </script>
 
 <style>
@@ -116,6 +212,7 @@ const handleDateTimeChange = (field, value) => {
 .interview-modal-overlay {
   position: fixed !important;
   inset: 0 !important;
+  min-height: 100vh !important;
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(8px);
   display: flex;
@@ -123,12 +220,14 @@ const handleDateTimeChange = (field, value) => {
   justify-content: center;
   z-index: 99999 !important;
   padding: 20px;
+  overflow-y: auto;
   pointer-events: auto !important;
 }
 .interview-modal-overlay * { pointer-events: auto; }
 </style>
 
 <style scoped>
+.modal-content, .modal-content * { pointer-events: auto !important; }
 .modal-content { background: var(--card-bg, #ffffff); border-radius: 24px; border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 40px 100px -20px rgba(0,0,0,0.15), inset 0 2px 0 rgba(255,255,255,0.7); overflow: hidden; display: flex; flex-direction: column; position: relative; z-index: 1; }
 
 .modal-header { padding: 24px 32px 16px; display: flex; justify-content: space-between; align-items: flex-start; }

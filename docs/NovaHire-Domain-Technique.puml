@@ -1,0 +1,30 @@
+@startuml NovaHire-Mapping-Technique
+title NovaHire - Correspondance metier / technique (reference dev)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+class Societe
+class Collaborateur
+class OffreEmploi
+class Candidature
+class AnalyseIAProfil
+
+class Company
+class User
+class JobOffer
+class JobApplication
+class AIAnalysisResult
+
+Societe .. Company : <<map>>
+Collaborateur .. User : <<map>>
+OffreEmploi .. JobOffer : <<map>>
+Candidature .. JobApplication : <<map>>
+AnalyseIAProfil .. AIAnalysisResult : <<map>>
+
+note as N1
+  Vue metier complete :
+  NovaHire-Domain-ClassDiagram.puml
+end note
+
+@enduml

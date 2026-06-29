@@ -1,0 +1,128 @@
+@startuml NovaHire-Sprint3-ClassDiagram
+title Sprint 3 - Pipeline de recrutement et evaluation\nDiagramme de classes (vue metier) - UML 2.5.1
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+enum StatutCandidature {
+  Recue
+  En_analyse
+  Preselection
+  Entretien
+  Entretien_realise
+  Offre_envoyee
+  Acceptee
+  Refusee
+}
+
+enum StatutEntretien {
+  Planifie
+  Realise
+  Annule
+  Reporte
+  Absent
+}
+
+class Candidature {
+  -statut : StatutCandidature
+  -scoreIA : Integer
+  -scoreQuiz : Integer
+  -contenuOffreEmbauche : String
+  -notesRecruteur : String
+  __
+  +changerStatut(nouveauStatut) : void
+  +comparerAvec(autre) : void
+  +genererOffreEmbauche() : void
+  +envoyerOffreEmbauche() : void
+}
+
+class Entretien {
+  -dateHeure : DateTime
+  -type : String
+  -lienOuLieu : String
+  -statut : StatutEntretien
+  __
+  +planifier() : void
+  +envoyerInvitation() : void
+}
+
+class QuizPreselection {
+  -titre : String
+  -dureeMinutes : Integer
+  -actif : Boolean
+  __
+  +genererParIA() : void
+  +envoyerAuCandidat() : void
+  +regenerer() : void
+}
+
+class QuestionQuiz {
+  -enonce : String
+  -options : String[]
+  -bonneReponse : Integer
+}
+
+class ResultatQuiz {
+  -score : Real
+  -reponses : Integer[]
+  -datePassage : Date
+  __
+  +calculerScore() : Real
+  +soumettre() : void
+}
+
+class CommentaireCandidature {
+  -contenu : String
+  -date : Date
+  __
+  +ajouter() : void
+}
+
+class EvaluationRecruteur {
+  -note : Integer
+  -commentaire : String
+  __
+  +noter() : void
+}
+
+class Notification {
+  -titre : String
+  -message : String
+  -lue : Boolean
+  __
+  +envoyer() : void
+  +marquerCommeLue() : void
+}
+
+class OffreEmploi {
+  -titre : String
+}
+
+class Collaborateur {
+  -nom : String
+}
+
+Candidature "1" o-- "0..*" Entretien : planifie
+Candidature "1" o-- "0..*" CommentaireCandidature : commentaires
+Candidature "1" o-- "0..*" EvaluationRecruteur : evalue
+Candidature "1" o-- "0..*" Notification : alertes
+Candidature "1" o-- "0..*" ResultatQuiz : resultats
+
+OffreEmploi "1" o-- "0..*" QuizPreselection : quiz
+QuizPreselection "1" *-- "1..*" QuestionQuiz : contient
+
+Collaborateur "1" o-- "0..*" Entretien : anime
+Collaborateur "1" o-- "0..*" CommentaireCandidature : redige
+Collaborateur "1" o-- "0..*" EvaluationRecruteur : attribue
+
+Candidature ..> StatutCandidature
+Entretien ..> StatutEntretien
+
+note bottom of Candidature
+  Preselection = Shortlisted (code)
+  changerStatut() = UpdateStatus()
+end note
+
+@enduml

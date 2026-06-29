@@ -16,6 +16,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Contrôleur gérant toutes les opérations d'accès public et anonyme (sans authentification).
+    /// Gère les statistiques de la plateforme, l'affichage des offres d'emploi publiques via token de partage, 
+    /// la soumission de candidatures anonymes (portail candidat) et les messages de contact général.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     [AllowAnonymous]
@@ -28,6 +33,15 @@ namespace API.Controllers
         private readonly IEmailService _emailService;
         private readonly IStorageService _storageService;
 
+        /// <summary>
+        /// Initialise une nouvelle instance de la classe <see cref="PublicController"/>.
+        /// </summary>
+        /// <param name="context">Contexte Entity Framework de l'application.</param>
+        /// <param name="jobOfferRepository">Repository pour la gestion des offres d'emploi.</param>
+        /// <param name="jobApplicationRepository">Repository pour la gestion des candidatures.</param>
+        /// <param name="environment">Environnement d'hébergement web.</param>
+        /// <param name="emailService">Service d'envoi d'e-mails.</param>
+        /// <param name="storageService">Service de stockage persistant des fichiers (ex: CVs).</param>
         public PublicController(
             ApplicationDbContext context,
             IJobOfferRepository jobOfferRepository,
@@ -44,11 +58,16 @@ namespace API.Controllers
             _storageService = storageService;
         }
 
+        /// <summary>
+        /// Récupère des statistiques globales de la plateforme (nombre de recruteurs actifs).
+        /// </summary>
+        /// <returns>Un objet JSON contenant le nombre total de recruteurs.</returns>
         [HttpGet("platform-stats")]
         public async Task<IActionResult> GetPlatformStats()
         {
             try
             {
+                // IgnoreQueryFilters est requis car les requêtes anonymes n'ont pas de claims d'entreprise (CompanyId)
                 var recruitersCount = await _context.Users!
                     .IgnoreQueryFilters()
                     .AsNoTracking()
@@ -63,15 +82,17 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Récupère une offre d'emploi publiée spécifique identifiée par son token de partage unique.
+        /// </summary>
+        /// <param name="token">Le jeton unique de partage de l'offre d'emploi.</param>
+        /// <returns>Le DTO contenant les informations de l'offre ainsi que la configuration dynamique de son formulaire de candidature.</returns>
         [HttpGet("offers/{token}")]
         public async Task<IActionResult> GetOfferByToken(string token)
         {
             try
             {
-                // Simple search by token (ignoring global query filters if any, 
-                // but since it's anonymous it might be blocked by multitenancy filter)
-                // We'll use _context.JobOffers.IgnoreQueryFilters() if needed.
-
+                // Recherche par token sans filtre global de multitenancy pour permettre l'affichage public
                 var offer = await _context.JobOffers!
                     .IgnoreQueryFilters()
                     .Include(o => o.Company)
@@ -79,7 +100,12 @@ namespace API.Controllers
 
                 if (offer == null || offer.Status != JobOfferStatus.Published)
                 {
-                    return NotFound(new { message = "Offre introuvable ou expirée" });
+                    return NotFound(new { message = "Offre introuvable ou fermée." });
+                }
+
+                if (offer.Deadline.HasValue && offer.Deadline.Value < DateTime.UtcNow)
+                {
+                    return NotFound(new { message = "La date limite pour postuler à cette offre est dépassée." });
                 }
 
                 var dto = new PublicOfferDto
@@ -104,7 +130,7 @@ namespace API.Controllers
                     PageSecondaryColor = offer.Company?.SecondaryColor ?? "#fcd34d",
                     WelcomeMsg = offer.Company?.Name != null ? $"Explorez vos futures opportunités chez {offer.Company.Name}." : "Explorez vos futures opportunités.",
                     Skills = offer.Skills ?? new List<string>(),
-                    // Form Configuration mapping
+                    // Mappage de la configuration dynamique du formulaire
                     RequireFullName = offer.FormConfig?.RequireFullName ?? true,
                     RequireEmail = offer.FormConfig?.RequireEmail ?? true,
                     RequirePhone = offer.FormConfig?.RequirePhone ?? false,
@@ -117,18 +143,6 @@ namespace API.Controllers
                     WeightSkills = offer.WeightSkills
                 };
 
-                // Check for Quiz
-                var quiz = await _context.Quizzes!
-                    .IgnoreQueryFilters()
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(q => q.JobOfferId == offer.Id && q.IsActive);
-                
-                if (quiz != null)
-                {
-                    dto.HasQuiz = true;
-                    dto.QuizTimeLimit = quiz.TimeLimitMinutes;
-                }
-
                 return Ok(dto);
             }
             catch (Exception ex)
@@ -137,6 +151,13 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Soumet la candidature d'un candidat à une offre d'emploi spécifique.
+        /// Valide les contraintes de l'offre, gère l'enregistrement/mise à jour du candidat, 
+        /// téléverse le fichier CV sur le cloud (Cloudinary) et enregistre la candidature.
+        /// </summary>
+        /// <param name="req">Le formulaire contenant les informations personnelles et le fichier CV du candidat.</param>
+        /// <returns>Un message de succès accompagné de l'ID de la candidature créée ou mise à jour.</returns>
         [HttpPost("applications")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> SubmitApplication([FromForm] PublicApplicationRequest req)
@@ -158,22 +179,22 @@ namespace API.Controllers
                     return NotFound(new { message = "Offre parente introuvable" });
                 }
 
-                // --- RECRUITMENT BUSINESS RULES ---
+                // --- REGLES METIER DE RECRUTEMENT ---
 
-                // 1. Check Offer Status
+                // 1. Vérification du statut de l'offre
                 if (offer.Status != JobOfferStatus.Published)
                 {
                     Console.WriteLine($"[PublicController] Offer {offer.Id} is not published (Status: {offer.Status})");
                     return BadRequest(new { message = "Cette offre n'est plus ouverte aux candidatures (Statut: " + offer.Status + ")" });
                 }
 
-                // 2. Check Deadline
+                // 2. Vérification de la date limite
                 if (offer.Deadline.HasValue && offer.Deadline.Value < DateTime.UtcNow)
                 {
                     return BadRequest(new { message = "La date limite pour postuler à cette offre est dépassée (" + offer.Deadline.Value.ToString("dd/MM/yyyy") + ")" });
                 }
 
-                // 3. Dynamic Form Validation (FormConfig)
+                // 3. Validation dynamique du formulaire selon la configuration de l'offre (FormConfig)
                 var config = offer.FormConfig ?? new ApplicationFormConfig();
                 
                 if (config.RequireFullName && (string.IsNullOrWhiteSpace(req.FirstName) || string.IsNullOrWhiteSpace(req.LastName)))
@@ -206,9 +227,9 @@ namespace API.Controllers
                     return BadRequest(new { message = "Le lien vers votre portfolio est requis." });
                 }
 
-                // --- END BUSINESS RULES ---
+                // --- FIN DES REGLES METIER ---
 
-                // Manage Candidate (Upsert) - Isolated by Company
+                // Gestion du Profil Candidat (Upsert) - Isolé par entreprise
                 var candidate = await _context.Candidates!
                     .IgnoreQueryFilters()
                     .FirstOrDefaultAsync(c => c.Email.ToLower() == req.Email.ToLower() && c.CompanyId == offer.CompanyId);
@@ -231,7 +252,7 @@ namespace API.Controllers
                 }
                 else
                 {
-                    // Update existing candidate info with latest data
+                    // Mise à jour du candidat existant avec les nouvelles données soumises
                     candidate.FirstName = req.FirstName;
                     candidate.LastName = req.LastName;
                     candidate.PhoneNumber = req.Phone;
@@ -240,7 +261,7 @@ namespace API.Controllers
                     candidate.UpdatedAt = DateTime.UtcNow;
                 }
 
-                // --- DUPLICATE CHECK & UPDATE LOGIC ---
+                // --- VERIFICATION DES DOUBLONS DE CANDIDATURES ---
                 var existingApp = await _context.JobApplications!
                     .IgnoreQueryFilters()
                     .FirstOrDefaultAsync(a => a.CandidateId == candidate.Id && a.JobOfferId == offer.Id);
@@ -254,7 +275,7 @@ namespace API.Controllers
                     return BadRequest(new { message = "Vous avez déjà postulé à cette offre et votre dossier a déjà été traité ou est à un stade avancé." });
                 }
 
-                // File Upload Handling (Cloudinary)
+                // Gestion du téléversement de fichier (vers le service de stockage Cloudinary)
                 string cvUrl = existingApp?.CVUrl ?? candidate.MainCVUrl ?? "https://placeholder-cv.url";
                 if (req.CVFile != null && req.CVFile.Length > 0)
                 {
@@ -273,13 +294,13 @@ namespace API.Controllers
                         cvUrl = await _storageService.UploadFileAsync(stream, req.CVFile.FileName, folderPath);
                     }
 
-                    // Update main CV for the candidate profile
+                    // Mise à jour du CV principal du candidat
                     candidate.MainCVUrl = cvUrl;
                 }
 
                 if (existingApp != null)
                 {
-                    // UPDATE EXISTING
+                    // MISE A JOUR D'UNE CANDIDATURE EXISTANTE
                     existingApp.CVUrl = cvUrl;
                     existingApp.CoverLetterUrl = req.CoverLetter;
                     existingApp.AppliedAt = DateTime.UtcNow;
@@ -288,7 +309,7 @@ namespace API.Controllers
                     await _jobApplicationRepository.UpdateAsync(existingApp);
                     await _jobApplicationRepository.SaveChangesAsync();
 
-                    // Send confirmation email (fire-and-forget, don't block the response)
+                    // Envoi asynchrone (fire-and-forget) de l'email de confirmation pour ne pas ralentir le client
                     _ = _emailService.SendApplicationConfirmationAsync(
                         candidate.Email,
                         $"{candidate.FirstName} {candidate.LastName}",
@@ -300,7 +321,7 @@ namespace API.Controllers
                 }
                 else
                 {
-                    // CREATE NEW
+                    // CREATION D'UNE NOUVELLE CANDIDATURE
                     var application = new JobApplication
                     {
                         Id = Guid.NewGuid(),
@@ -316,7 +337,7 @@ namespace API.Controllers
                     await _jobApplicationRepository.AddAsync(application);
                     await _jobApplicationRepository.SaveChangesAsync();
 
-                    // Send confirmation email (fire-and-forget, don't block the response)
+                    // Envoi asynchrone (fire-and-forget) de l'email de confirmation
                     _ = _emailService.SendApplicationConfirmationAsync(
                         candidate.Email,
                         $"{candidate.FirstName} {candidate.LastName}",
@@ -334,6 +355,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Soumet un message de contact général depuis le site web public.
+        /// </summary>
+        /// <param name="req">Le message contenant les coordonnées de l'expéditeur.</param>
         [HttpPost("contact")]
         public async Task<IActionResult> SubmitContactMessage([FromBody] ContactMessageDto req)
         {
@@ -357,6 +382,9 @@ namespace API.Controllers
             return Ok(new { message = "Message envoyé avec succès" });
         }
 
+        /// <summary>
+        /// DTO de requête pour la soumission d'un message de contact.
+        /// </summary>
         public class ContactMessageDto
         {
             public required string FullName { get; set; }
@@ -366,6 +394,9 @@ namespace API.Controllers
             public required string Message { get; set; }
         }
 
+        /// <summary>
+        /// Modèle contenant les paramètres de formulaire multipart pour soumettre une candidature.
+        /// </summary>
         public class PublicApplicationRequest
         {
             public string ShareToken { get; set; } = string.Empty;
@@ -378,50 +409,6 @@ namespace API.Controllers
             public string? CoverLetter { get; set; }
             public string? Source { get; set; }
             public IFormFile? CVFile { get; set; }
-        }
-
-        // ── CV Preview Parsing (Transparency) ──
-
-        [HttpPost("parse-cv")]
-        [Consumes("multipart/form-data")]
-        public async Task<IActionResult> ParseCVPreview(IFormFile file)
-        {
-            try
-            {
-                if (file == null || file.Length == 0)
-                    return BadRequest(new { message = "Aucun fichier fourni." });
-
-                var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-                if (ext != ".pdf" && ext != ".docx" && ext != ".doc")
-                    return BadRequest(new { message = "Seuls les fichiers PDF et DOCX sont acceptés." });
-
-                // Save to temp file
-                var tempDir = Path.Combine(Path.GetTempPath(), "novahire-cv-preview");
-                Directory.CreateDirectory(tempDir);
-                var tempPath = Path.Combine(tempDir, $"{Guid.NewGuid()}{ext}");
-                
-                using (var stream = new FileStream(tempPath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
-
-                try
-                {
-                    var aiService = HttpContext.RequestServices.GetRequiredService<Application.Interfaces.IAIService>();
-                    var extractedData = await aiService.ExtractCVAsync(tempPath);
-                    return Ok(extractedData);
-                }
-                finally
-                {
-                    // Clean up temp file
-                    if (System.IO.File.Exists(tempPath))
-                        System.IO.File.Delete(tempPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = $"Erreur lors de l'extraction: {ex.Message}" });
-            }
         }
     }
 }

@@ -1,0 +1,98 @@
+@startuml NovaHire-Sprint4-ClassDiagram
+title Sprint 4 - Administration et analytics\nDiagramme de classes (vue metier) - UML 2.5.1
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+enum StatutSociete {
+  En_attente
+  Validee
+  Refusee
+  Suspendue
+}
+
+enum StatutMessageSupport {
+  Nouveau
+  En_cours
+  Traite
+  Archive
+}
+
+enum RoleCollaborateur {
+  Admin_plateforme
+  Admin_entreprise
+  Recruteur
+}
+
+class Societe {
+  -nom : String
+  -emailContact : String
+  -statut : StatutSociete
+  -active : Boolean
+  __
+  +approuver() : void
+  +rejeter() : void
+  +suspendre() : void
+  +reactiver() : void
+}
+
+class Collaborateur {
+  -nom : String
+  -email : String
+  -role : RoleCollaborateur
+  -actif : Boolean
+  __
+  +activer() : void
+  +desactiver() : void
+}
+
+class AdminPlateforme {
+  -email : String
+  __
+  +validerEntreprise() : void
+  +gererUtilisateurs() : void
+  +consulterTableauBord() : void
+}
+
+class TraceActivite {
+  -action : String
+  -typeEntite : String
+  -details : String
+  -date : Date
+  -auteurEmail : String
+  __
+  +enregistrer() : void
+  +filtrer(criteres) : TraceActivite[]
+}
+
+class MessageContact {
+  -nom : String
+  -email : String
+  -message : String
+  -statut : StatutMessageSupport
+  -dateEnvoi : Date
+  __
+  +envoyer() : void
+  +changerStatut() : void
+}
+
+AdminPlateforme --|> Collaborateur
+
+Societe "1" o-- "0..*" Collaborateur : emploie
+
+Societe ..> StatutSociete
+Collaborateur ..> RoleCollaborateur
+MessageContact ..> StatutMessageSupport
+
+TraceActivite ..> Societe : audite
+TraceActivite ..> Collaborateur : auteur
+MessageContact ..> AdminPlateforme : traite par
+
+note bottom of StatutMessageSupport
+  Code C# : New, InProgress,
+  Resolved, Archived
+end note
+
+@enduml

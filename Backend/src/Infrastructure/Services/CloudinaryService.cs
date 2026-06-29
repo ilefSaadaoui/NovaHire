@@ -8,10 +8,20 @@ using System.Threading.Tasks;
 
 namespace Infrastructure.Services
 {
+    /// <summary>
+    /// Service de gestion du stockage de fichiers sur Cloudinary.
+    /// Gère l'upload, la suppression et la génération d'URLs signées pour les fichiers de CV (PDF, DOCX)
+    /// et tout autre actif binaire de la plateforme NovaHire.
+    /// </summary>
     public class CloudinaryService : IStorageService
     {
         private readonly Cloudinary _cloudinary;
 
+        /// <summary>
+        /// Initialise une nouvelle instance de <see cref="CloudinaryService"/>.
+        /// Lit les clés d'API Cloudinary depuis la configuration et active les URLs sécurisées (HTTPS).
+        /// </summary>
+        /// <param name="configuration">La configuration de l'application (section 'CloudinarySettings').</param>
         public CloudinaryService(IConfiguration configuration)
         {
             var cloudName = configuration["CloudinarySettings:CloudName"];
@@ -25,12 +35,21 @@ namespace Infrastructure.Services
 
             var account = new Account(cloudName, apiKey, apiSecret);
             _cloudinary = new Cloudinary(account);
-            _cloudinary.Api.Secure = true;
+            _cloudinary.Api.Secure = true; // Forcer HTTPS sur toutes les URLs générées
         }
 
+        /// <summary>
+        /// Téléverse un fichier brut (PDF ou DOCX) sur Cloudinary dans le répertoire spécifié.
+        /// Utilise le type de ressource 'raw' pour préserver l'intégrité du fichier binaire.
+        /// </summary>
+        /// <param name="fileStream">Le flux de données binaires du fichier.</param>
+        /// <param name="fileName">Le nom du fichier avec son extension.</param>
+        /// <param name="folderPath">Le chemin du dossier de destination sur Cloudinary.</param>
+        /// <returns>L'URL HTTPS sécurisée du fichier téléversé.</returns>
         public async Task<string> UploadFileAsync(Stream fileStream, string fileName, string folderPath)
         {
-            // On utilise RawUploadParams pour les documents (PDF, DOCX)
+            // Utilisation de RawUploadParams pour les documents binaires (PDF, DOCX)
+            // Cela préserve l'extension du fichier, contrairement à ImageUploadParams
             var uploadParams = new RawUploadParams()
             {
                 File = new FileDescription(fileName, fileStream),
@@ -51,6 +70,12 @@ namespace Infrastructure.Services
             return uploadResult.SecureUrl.ToString();
         }
 
+        /// <summary>
+        /// Supprime un fichier de type 'raw' (PDF, DOCX) sur Cloudinary à partir de son URL.
+        /// Extrait dynamiquement le PublicId Cloudinary depuis l'URL du fichier.
+        /// </summary>
+        /// <param name="fileUrl">L'URL HTTPS complète du fichier Cloudinary à supprimer.</param>
+        /// <returns><c>true</c> si la suppression a réussi, <c>false</c> sinon.</returns>
         public async Task<bool> DeleteFileAsync(string fileUrl)
         {
             if (string.IsNullOrEmpty(fileUrl) || !fileUrl.Contains("cloudinary.com"))
@@ -91,6 +116,12 @@ namespace Infrastructure.Services
                 return false;
             }
         }
+        /// <summary>
+        /// Génère une URL de téléchargement signée pour un fichier 'raw' Cloudinary.
+        /// L'URL signée inclut un token de sécurité temporaire permettant d'accéder au fichier sans exposition publique des clés API.
+        /// </summary>
+        /// <param name="fileUrl">L'URL HTTPS du fichier Cloudinary.</param>
+        /// <returns>L'URL signée et sécurisée prête à être utilisée pour le téléchargement.</returns>
         public string GetDownloadUrl(string fileUrl)
         {
             if (string.IsNullOrEmpty(fileUrl) || !fileUrl.Contains("cloudinary.com"))
@@ -111,8 +142,8 @@ namespace Infrastructure.Services
                 int startIndex = uploadIndex + 2;
                 var publicId = string.Join("/", segments.Skip(startIndex));
 
-                // Generate a signed delivery URL for raw files on the "upload" delivery type.
-                // With version kept from the original URL, this avoids v1 mismatches.
+                // Construction de l'URL signée pour les ressources 'raw' en HTTPS
+                // On préserve la version de l'URL originale pour éviter les incohérences de version
                 var urlBuilder = _cloudinary.Api.Url
                     .ResourceType("raw")
                     .Type("upload")

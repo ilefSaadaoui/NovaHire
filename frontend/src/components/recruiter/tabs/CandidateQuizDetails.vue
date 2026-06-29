@@ -180,9 +180,15 @@
         <div class="empty-glass-circle">
           <ClipboardCheck :size="40" />
         </div>
-        <h2>Évaluation Introuvable</h2>
-        <p>Le candidat n'a pas encore complété son test technique IA.</p>
-        <button class="pill-btn primary mt-4" @click="fetchResults">Actualiser</button>
+        <template v-if="candidate?.hasQuizGenerated">
+          <h2>Évaluation Introuvable</h2>
+          <p>Le candidat n'a pas encore complété son test technique IA.</p>
+          <button class="pill-btn primary mt-4" @click="fetchResults">Actualiser</button>
+        </template>
+        <template v-else>
+          <h2>Quiz non généré</h2>
+          <p>Le quiz technique IA n'a pas encore été généré pour cette offre d'emploi.</p>
+        </template>
       </div>
 
     </div>
@@ -199,7 +205,8 @@ import {
 import api from '@/api/axios'
 
 const props = defineProps({
-  applicationId: { type: String, required: true }
+  applicationId: { type: String, required: true },
+  candidate: { type: Object, default: () => ({}) }
 })
 
 const result = ref(null)
@@ -217,7 +224,11 @@ const fetchResults = async () => {
     const res = await api.get(`/quiz/results/${props.applicationId}`)
     result.value = res.data
   } catch (err) {
-    console.error('Erreur quiz details:', err)
+    if (err.response && err.response.status === 404) {
+      result.value = null
+    } else {
+      console.error('Erreur quiz details:', err)
+    }
   } finally {
     loading.value = false
   }

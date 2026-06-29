@@ -21,8 +21,8 @@ defineProps({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 0;
-  margin-bottom: 32px;
+  padding: 16px 0;
+  margin-bottom: 16px;
   border-bottom: 1px solid var(--r-border);
 }
 

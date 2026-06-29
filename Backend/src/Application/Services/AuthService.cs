@@ -12,7 +12,9 @@ using Microsoft.Extensions.Logging;
 namespace Application.Services
 {
     /// <summary>
-    /// Service d'authentification
+    /// Service d'authentification pour NovaHire.
+    /// Gère l'inscription des utilisateurs et des entreprises, la connexion, la gestion des tokens de session (JWT),
+    /// le renouvellement (Refresh Token), ainsi que les flux de réinitialisation et de changement de mots de passe.
     /// </summary>
     public class AuthService : IAuthService
     {
@@ -22,6 +24,14 @@ namespace Application.Services
         private readonly IEmailService _emailService;
         private readonly ILogger<AuthService> _logger;
 
+        /// <summary>
+        /// Initialise une nouvelle instance de <see cref="AuthService"/>.
+        /// </summary>
+        /// <param name="userRepository">Repository de gestion des données utilisateurs.</param>
+        /// <param name="companyRepository">Repository de gestion des données d'entreprises.</param>
+        /// <param name="jwtTokenService">Service de génération et validation des tokens JWT.</param>
+        /// <param name="emailService">Service d'envoi d'e-mails.</param>
+        /// <param name="logger">Logger pour les évènements de sécurité et d'audit.</param>
         public AuthService(
             IUserRepository userRepository,
             ICompanyRepository companyRepository,
@@ -36,6 +46,12 @@ namespace Application.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        /// <summary>
+        /// Enregistre un nouvel utilisateur au sein d'une entreprise existante.
+        /// Valide l'unicité de l'adresse email et la limite des comptes autorisés par l'abonnement entreprise.
+        /// </summary>
+        /// <param name="registerDto">Les données d'inscription de l'utilisateur.</param>
+        /// <returns>Les informations d'authentification incluant les tokens d'accès.</returns>
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
         {
             try
@@ -69,7 +85,7 @@ namespace Application.Services
                         throw new InvalidOperationException("Société introuvable ou inactive");
                     }
 
-                    // Vérifier la limite d'utilisateurs
+                    // Vérifier la limite d'utilisateurs autorisés au sein de l'entreprise
                     var canAddUser = await _companyRepository.CanAddUserAsync(registerDto.CompanyId.Value);
                     if (!canAddUser)
                     {
@@ -106,7 +122,7 @@ namespace Application.Services
                     _logger.LogWarning($"Échec de l'envoi de l'email de confirmation à: {user.Email}");
                 }
 
-                // Générer les tokens même si l'email n'est pas confirmé
+                // Générer les tokens même si l'email n'est pas encore validé par l'utilisateur
                 return await GenerateAuthResponse(user);
             }
             catch (Exception ex)
@@ -116,11 +132,17 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Enregistre une nouvelle entreprise partenaire ainsi que son administrateur principal.
+        /// Optionnellement, invite un recruteur secondaire avec un mot de passe temporaire généré automatiquement.
+        /// </summary>
+        /// <param name="registerDto">Les informations de l'entreprise et du compte administrateur.</param>
+        /// <returns>Les informations de réponse d'authentification stipulant l'approbation requise.</returns>
         public async Task<AuthResponseDto> RegisterCompanyAsync(CompanyRegisterDto registerDto)
         {
             try
             {
-                // 1. Vérifications initiales
+                // 1. Vérifications initiales d'unicité
                 if (await _userRepository.IsEmailTakenAsync(registerDto.AdminEmail))
                 {
                     throw new InvalidOperationException("L'email de l'administrateur est déjà utilisé");
@@ -232,30 +254,60 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Connecte un utilisateur en vérifiant son e-mail, son mot de passe et son statut d'activité globale.
+        /// </summary>
+        /// <param name="loginDto">Les données de connexion.</param>
+        /// <returns>La réponse d'authentification incluant les jetons JWT.</returns>
         public async Task<AuthResponseDto> LoginAsync(LoginDto loginDto)
         {
             try
             {
-                var user = await _userRepository.GetByEmailWithCompanyAsync(loginDto.Email);
+                var email = loginDto.Email?.Trim().ToLowerInvariant() ?? string.Empty;
+                var password = loginDto.Password?.Trim() ?? string.Empty;
+                var user = await _userRepository.GetByEmailWithCompanyAsync(email);
 
                 if (user == null)
                 {
                     throw new UnauthorizedAccessException("Email ou mot de passe incorrect");
                 }
 
-                if (!VerifyPassword(loginDto.Password, user.PasswordHash))
+                // Vérification du mot de passe avec BCrypt ou fallback sécurisé vers SHA256
+                if (!VerifyPassword(password, user.PasswordHash))
                 {
                     throw new UnauthorizedAccessException("Email ou mot de passe incorrect");
                 }
 
                 if (!user.IsActive)
                 {
-                    throw new UnauthorizedAccessException("Ce compte est désactivé");
+                    throw new UnauthorizedAccessException(
+                        "Ce compte est désactivé. Si vous venez de vous inscrire, attendez la validation de votre entreprise par l'administrateur.");
+                }
+
+                if (user.Role != UserRole.SuperAdmin && user.CompanyId.HasValue)
+                {
+                    var company = user.Company;
+                    if (company != null)
+                    {
+                        if (company.Status == CompanyStatus.Pending)
+                        {
+                            throw new UnauthorizedAccessException(
+                                "Votre entreprise est en attente de validation par l'administrateur de la plateforme.");
+                        }
+
+                        if (!company.IsActive
+                            || company.Status == CompanyStatus.Rejected
+                            || company.Status == CompanyStatus.Suspended)
+                        {
+                            throw new UnauthorizedAccessException(
+                                "Accès refusé : votre entreprise est inactive, refusée ou suspendue.");
+                        }
+                    }
                 }
 
                 // Le système d'abonnement est supprimé. La vérification est toujours positive.
 
-                // Mettre à jour la date de dernière connexion
+                // Mettre à jour la date de dernière connexion pour des raisons de statistiques RH
                 user.LastLoginAt = DateTime.UtcNow;
                 await _userRepository.UpdateAsync(user);
                 await _userRepository.SaveChangesAsync();
@@ -271,6 +323,11 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Renouvelle le jeton d'accès Access Token en échange d'un Refresh Token valide.
+        /// </summary>
+        /// <param name="refreshTokenDto">Le Refresh Token courant de l'utilisateur.</param>
+        /// <returns>Une nouvelle paire de jetons d'accès.</returns>
         public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto)
         {
             try
@@ -287,14 +344,13 @@ namespace Application.Services
                     throw new UnauthorizedAccessException("Ce compte est désactivé");
                 }
 
-                // Optional: Validate the access token if provided (now it's safe because it's nullable)
+                // Optionnel : Valider la signature du jeton d'accès expiré
                 if (!string.IsNullOrEmpty(refreshTokenDto.AccessToken))
                 {
                     var principal = await _jwtTokenService.ValidateTokenAsync(refreshTokenDto.AccessToken);
                     if (principal == null)
                     {
                         _logger.LogWarning("Access token invalide lors du refresh");
-                        // Continue anyway - refresh token is what matters
                     }
                 }
 
@@ -309,6 +365,10 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Révoque la session de l'utilisateur connecté en supprimant ses jetons Refresh Token en base de données.
+        /// </summary>
+        /// <param name="userId">Identifiant unique de l'utilisateur connecté.</param>
         public async Task LogoutAsync(Guid userId)
         {
             try
@@ -331,15 +391,21 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Initie la procédure de mot de passe oublié en générant un jeton à validité limitée et en envoyant un e-mail de réinitialisation.
+        /// </summary>
+        /// <param name="forgotPasswordDto">Les informations de réinitialisation de mot de passe.</param>
+        /// <returns>True si le processus a été complété sans divulguer l'existence ou non du compte.</returns>
         public async Task<bool> ForgotPasswordAsync(ForgotPasswordDto forgotPasswordDto)
         {
             try
             {
-                var user = await _userRepository.GetByEmailAsync(forgotPasswordDto.Email);
+                var user = await _userRepository.GetByEmailAsync(
+                    forgotPasswordDto.Email?.Trim().ToLowerInvariant() ?? string.Empty);
 
                 if (user == null)
                 {
-                    // Ne pas révéler si l'email existe ou non (sécurité)
+                    // Protection contre l'énumération des emails
                     return true;
                 }
 
@@ -368,13 +434,20 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Réinitialise le mot de passe utilisateur à l'aide d'un jeton de réinitialisation valide envoyé par email.
+        /// </summary>
+        /// <param name="resetPasswordDto">Le nouveau mot de passe et le jeton d'authentification associé.</param>
+        /// <returns>True si le mot de passe a été modifié avec succès.</returns>
         public async Task<bool> ResetPasswordAsync(ResetPasswordDto resetPasswordDto)
         {
             try
             {
-                var user = await _userRepository.GetByEmailAsync(resetPasswordDto.Email);
+                var email = resetPasswordDto.Email?.Trim().ToLowerInvariant() ?? string.Empty;
+                var token = NormalizeToken(resetPasswordDto.Token);
+                var user = await _userRepository.GetByEmailAsync(email);
 
-                if (user == null || !user.IsPasswordResetTokenValid() || user.PasswordResetToken != resetPasswordDto.Token)
+                if (user == null || !user.IsPasswordResetTokenValid() || !TokenEquals(user.PasswordResetToken, token))
                 {
                     throw new InvalidOperationException("Token de réinitialisation invalide ou expiré");
                 }
@@ -397,6 +470,12 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Modifie le mot de passe actuel d'un utilisateur authentifié.
+        /// </summary>
+        /// <param name="userId">Identifiant unique de l'utilisateur émetteur.</param>
+        /// <param name="changePasswordDto">Les informations de mot de passe actuel et de nouveau mot de passe.</param>
+        /// <returns>True si le changement a été appliqué avec succès.</returns>
         public async Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordDto changePasswordDto)
         {
             try
@@ -428,13 +507,20 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Confirme l'adresse e-mail d'un utilisateur à l'aide de son token de confirmation.
+        /// </summary>
+        /// <param name="confirmEmailDto">L'email de l'utilisateur et le jeton de confirmation reçu.</param>
+        /// <returns>True si l'email a été validé.</returns>
         public async Task<bool> ConfirmEmailAsync(ConfirmEmailDto confirmEmailDto)
         {
             try
             {
-                var user = await _userRepository.GetByEmailAsync(confirmEmailDto.Email);
+                var email = confirmEmailDto.Email?.Trim().ToLowerInvariant() ?? string.Empty;
+                var token = NormalizeToken(confirmEmailDto.Token);
+                var user = await _userRepository.GetByEmailAsync(email);
 
-                if (user == null || user.EmailConfirmationToken != confirmEmailDto.Token)
+                if (user == null || !TokenEquals(user.EmailConfirmationToken, token))
                 {
                     throw new InvalidOperationException("Token de confirmation invalide");
                 }
@@ -456,6 +542,11 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Renvoie l'e-mail de confirmation avec un nouveau token généré de manière aléatoire.
+        /// </summary>
+        /// <param name="email">L'e-mail destinataire.</param>
+        /// <returns>True si le renvoi a été exécuté.</returns>
         public async Task<bool> ResendConfirmationEmailAsync(string email)
         {
             try
@@ -464,7 +555,7 @@ namespace Application.Services
 
                 if (user == null || user.EmailConfirmed)
                 {
-                    return true; // Ne pas révéler si l'email existe
+                    return true; // Protection contre la divulgation d'email existant
                 }
 
                 user.EmailConfirmationToken = GenerateRandomToken();
@@ -482,11 +573,23 @@ namespace Application.Services
             }
         }
 
+        /// <summary>
+        /// Vérifie si une adresse email est déjà enregistrée en base de données.
+        /// </summary>
+        /// <param name="email">L'email à analyser.</param>
+        /// <returns>True si l'email est déjà utilisé, False sinon.</returns>
         public async Task<bool> IsEmailTakenAsync(string email)
         {
             return await _userRepository.IsEmailTakenAsync(email);
         }
 
+        /// <summary>
+        /// Modifie le mot de passe temporaire attribué lors d'une invitation entreprise.
+        /// Désactive le drapeau 'MustChangePassword' requis.
+        /// </summary>
+        /// <param name="userId">Identifiant unique de l'utilisateur.</param>
+        /// <param name="changePasswordDto">Le nouveau mot de passe souhaité.</param>
+        /// <returns>True si le mot de passe initial a été mis à jour.</returns>
         public async Task<bool> ChangeInitialPasswordAsync(Guid userId, ChangePasswordDto changePasswordDto)
         {
             try
@@ -494,8 +597,8 @@ namespace Application.Services
                 var user = await _userRepository.GetByIdAsync(userId);
                 if (user == null) throw new InvalidOperationException("Utilisateur introuvable");
 
-                // No need to verify temporary password here as user just logged in with it to get this far
-                // and the userId is extracted from the secure JWT claims.
+                // Pas besoin de revérifier le mot de passe temporaire car l'utilisateur s'est déjà connecté avec succès 
+                // et l'identifiant est extrait de manière sécurisée depuis les claims JWT.
 
                 user.PasswordHash = HashPassword(changePasswordDto.NewPassword);
                 user.MustChangePassword = false;
@@ -550,17 +653,21 @@ namespace Application.Services
 
         private bool VerifyPassword(string password, string hash)
         {
-            try
+            if (string.IsNullOrEmpty(hash))
+            {
+                return false;
+            }
+
+            // BCrypt hashes always start with $2a$, $2b$, $2y$, etc.
+            if (hash.StartsWith("$2", StringComparison.Ordinal))
             {
                 return BCrypt.Net.BCrypt.Verify(password, hash);
             }
-            catch
-            {
-                // Fallback for legacy SHA256 hashes during migration
-                using var sha256 = SHA256.Create();
-                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-                return Convert.ToBase64String(hashedBytes) == hash;
-            }
+
+            // Legacy SHA256 hashes (données seed / anciens comptes)
+            using var sha256 = SHA256.Create();
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+            return Convert.ToBase64String(hashedBytes) == hash;
         }
 
         private string GenerateRandomToken()
@@ -568,7 +675,36 @@ namespace Application.Services
             var randomNumber = new byte[32];
             using var rng = RandomNumberGenerator.Create();
             rng.GetBytes(randomNumber);
-            return Convert.ToBase64String(randomNumber);
+            // URL-safe : évite la corruption des + / = dans les liens e-mail
+            return Convert.ToBase64String(randomNumber)
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+        }
+
+        private static string NormalizeToken(string? token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return string.Empty;
+            }
+
+            var normalized = Uri.UnescapeDataString(token.Trim());
+            // Les query strings transforment parfois '+' en espace
+            return normalized.Replace(' ', '+');
+        }
+
+        private static bool TokenEquals(string? storedToken, string providedToken)
+        {
+            if (string.IsNullOrEmpty(storedToken) || string.IsNullOrEmpty(providedToken))
+            {
+                return false;
+            }
+
+            return string.Equals(
+                NormalizeToken(storedToken),
+                NormalizeToken(providedToken),
+                StringComparison.Ordinal);
         }
 
         private string GenerateTemporaryPassword(int length = 12)

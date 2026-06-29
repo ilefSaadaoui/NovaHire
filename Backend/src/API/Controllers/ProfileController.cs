@@ -10,6 +10,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Contrôleur gérant les opérations liées au profil de l'utilisateur connecté (informations, mot de passe, avatar).
+    /// Nécessite une authentification (token JWT).
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
@@ -26,6 +30,11 @@ namespace API.Controllers
             _environment = environment;
         }
 
+        /// <summary>
+        /// Extrait l'ID de l'utilisateur connecté à partir des claims du token JWT.
+        /// </summary>
+        /// <returns>Le UserId sous forme de Guid.</returns>
+        /// <exception cref="UnauthorizedAccessException">Si l'ID n'est pas présent ou invalide.</exception>
         private Guid GetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -36,6 +45,10 @@ namespace API.Controllers
             return userId;
         }
 
+        /// <summary>
+        /// Récupère les informations détaillées du profil de l'utilisateur connecté.
+        /// </summary>
+        /// <returns>Les informations de l'utilisateur incluant son département.</returns>
         [HttpGet]
         public async Task<IActionResult> GetProfile()
         {
@@ -67,6 +80,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Met à jour les informations de base du profil de l'utilisateur connecté.
+        /// Seuls les champs fournis dans la requête seront modifiés.
+        /// </summary>
+        /// <param name="dto">Les nouvelles informations (Prénom, Nom, Téléphone).</param>
         [HttpPut]
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
         {
@@ -92,6 +110,10 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Permet à l'utilisateur connecté de modifier son mot de passe en fournissant l'ancien et le nouveau mot de passe.
+        /// </summary>
+        /// <param name="dto">Les données de changement de mot de passe.</param>
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
         {
@@ -113,6 +135,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Permet d'uploader et de mettre à jour la photo de profil (avatar) de l'utilisateur connecté.
+        /// </summary>
+        /// <param name="file">Le fichier image (jpg, jpeg, png, webp).</param>
+        /// <returns>L'URL relative de l'avatar enregistré.</returns>
         [HttpPost("avatar")]
         public async Task<IActionResult> UploadAvatar(IFormFile file)
         {

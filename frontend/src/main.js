@@ -6,6 +6,7 @@ import router from './router'
 import i18n from './i18n'
 import './assets/style.css'
 import './assets/vivid-bg.css'
+import '@fortawesome/fontawesome-free/css/all.min.css'
 import { useAuthStore } from './stores/authStore'
 import { vIntersect } from './directives/v-intersect'
 

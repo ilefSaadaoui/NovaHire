@@ -1,0 +1,400 @@
+@startuml NovaHire_Final_With_Methods
+' =============================================================================
+' NovaHire - Diagramme de classes global METIER avec methodes (PFE)
+' Vue domaine uniquement (sans couche services)
+' UML 2.5.1 | PlantUML
+' =============================================================================
+
+title NovaHire - Diagramme de classes metier global avec methodes (PFE)
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam dpi 200
+skinparam defaultFontName Arial
+
+legend right
+  |= Symbole |= Usage dans ce diagramme |
+  | *-- | Composition (cycle de vie lie au parent) |
+  | o-- | Agregation (partie autonome rattachee) |
+  | -- | Association simple (lien logique) |
+  | ..> | Dependance (audit, traitement) |
+endlegend
+
+'====================================================
+' ENUMERATIONS
+'====================================================
+
+package "Enumerations" {
+
+  enum StatutSociete {
+    En_attente
+    Validee
+    Refusee
+    Suspendue
+  }
+
+  enum RoleCollaborateur {
+    Admin_plateforme
+    Admin_entreprise
+    Recruteur
+  }
+
+  enum StatutOffre {
+    Brouillon
+    Publiee
+    Fermee
+    Archivee
+  }
+
+  enum StatutCandidature {
+    Recue
+    En_analyse
+    Preselection
+    Entretien
+    Entretien_realise
+    Offre_envoyee
+    Acceptee
+    Refusee
+  }
+
+  enum StatutEntretien {
+    Planifie
+    Realise
+    Annule
+    Reporte
+    Absent
+  }
+
+  enum StatutMessageSupport {
+    Nouveau
+    En_cours
+    Traite
+    Archive
+  }
+}
+
+'====================================================
+' ORGANISATION
+'====================================================
+
+package "Organisation" {
+
+  class Societe {
+    nom : String
+    secteur : String
+    emailContact : String
+    statut : StatutSociete
+    dateCreation : Date
+    active : Boolean
+    __
+    inscrire()
+    approuver()
+    rejeter()
+    suspendre()
+    reactiver()
+    modifierProfil()
+  }
+
+  class Departement {
+    nom : String
+    description : String
+    __
+    creer()
+    affecterCollaborateur()
+  }
+
+  class Collaborateur {
+    nom : String
+    prenom : String
+    email : String
+    role : RoleCollaborateur
+    actif : Boolean
+    __
+    seConnecter()
+    activerCompte()
+    desactiverCompte()
+    mettreAJourProfil()
+  }
+
+  class AdminPlateforme {
+    validerEntreprise()
+    gererUtilisateurs()
+    consulterTableauBord()
+  }
+
+  class AdminEntreprise {
+    inviterRecruteur()
+    gererEquipe()
+    configurerBranding()
+  }
+}
+
+'====================================================
+' RECRUTEMENT
+'====================================================
+
+package "Recrutement" {
+
+  class OffreEmploi {
+    titre : String
+    description : String
+    lieu : String
+    typeContrat : String
+    dateLimite : Date
+    statut : StatutOffre
+    jetonPartage : String
+    __
+    publier()
+    fermer()
+    archiver()
+    estActive()
+    modifierOffre()
+    genererDescriptionIA()
+  }
+
+  class Candidat {
+    nom : String
+    prenom : String
+    email : String
+    telephone : String
+    cvUrl : String
+    __
+    postuler()
+    mettreAJourCV()
+  }
+
+  class Candidature {
+    dateDepot : Date
+    statut : StatutCandidature
+    urlCV : String
+    scoreIA : Integer
+    scoreQuiz : Integer
+    notesRecruteur : String
+    __
+    changerStatut()
+    lancerAnalyseIA()
+    gererPropositionEmbauche()
+  }
+
+  class OffreEmbauche <<concept>> {
+    dateEmission : Date
+    contenu : String
+    __
+    generer()
+    envoyer()
+  }
+}
+
+'====================================================
+' SELECTION
+'====================================================
+
+package "Selection" {
+
+  class Entretien {
+    dateHeure : DateTime
+    type : String
+    lienOuLieu : String
+    statut : StatutEntretien
+    __
+    planifier()
+    reprogrammer()
+    annuler()
+    marquerRealise()
+    envoyerInvitation()
+  }
+
+  class CommentaireCandidature {
+    contenu : String
+    date : Date
+    idCommentaireParent : Guid
+    __
+    ajouterCommentaire()
+    repondre()
+  }
+
+  class EvaluationRecruteur {
+    note : Integer
+    commentaire : String
+    __
+    noter()
+    modifierNote()
+  }
+
+  class Notification {
+    titre : String
+    message : String
+    lue : Boolean
+    __
+    envoyer()
+    marquerCommeLue()
+  }
+}
+
+'====================================================
+' EVALUATION (IA + QUIZ)
+'====================================================
+
+package "Evaluation" {
+
+  class QuizPreselection {
+    titre : String
+    dureeMinutes : Integer
+    actif : Boolean
+    __
+    genererParIA()
+    activer()
+    desactiver()
+    envoyerAuxCandidats()
+  }
+
+  class QuestionQuiz {
+    enonce : String
+    options : String[]
+    bonneReponse : Integer
+    __
+    modifierQuestion()
+  }
+
+  class ResultatQuiz {
+    score : Real
+    datePassage : Date
+    __
+    calculerScore()
+    soumettre()
+  }
+
+  class AnalyseIAProfil {
+    scoreGlobal : Integer
+    scoreExperience : Integer
+    scoreFormation : Integer
+    scoreCompetences : Integer
+    resume : String
+    recommandation : String
+    pointsForts : String[]
+    pointsVigilance : String[]
+    __
+    extraireDonneesCV()
+    genererAnalyse()
+  }
+}
+
+'====================================================
+' PLATEFORME
+'====================================================
+
+package "Plateforme" {
+
+  class TraceActivite {
+    action : String
+    typeEntite : String
+    details : String
+    date : Date
+    __
+    enregistrer()
+    filtrer()
+  }
+
+  class MessageContact {
+    nom : String
+    email : String
+    message : String
+    statut : StatutMessageSupport
+    __
+    envoyer()
+    changerStatut()
+  }
+}
+
+'====================================================
+' GENERALISATION
+'====================================================
+
+AdminPlateforme --|> Collaborateur
+AdminEntreprise --|> Collaborateur
+
+'====================================================
+' ASSOCIATIONS (UML harmonise)
+'====================================================
+
+' --- Organisation ---
+Societe "1" *-- "0..*" Departement : contient
+Societe "1" o-- "0..*" Collaborateur : emploie
+Societe "1" *-- "0..*" OffreEmploi : publie
+Societe "1" -- "0..*" Candidat : enregistre
+
+Departement "1" o-- "0..*" Collaborateur : regroupe
+
+' --- Recrutement ---
+Collaborateur "1" -- "0..*" OffreEmploi : cree
+
+OffreEmploi "1" o-- "0..*" Candidature : recoit
+Candidat "1" o-- "0..*" Candidature : depose
+Collaborateur "0..1" -- "0..*" Candidature : instruit
+
+Candidature "1" *-- "0..1" AnalyseIAProfil : diagnostic
+Candidature "1" *-- "0..1" OffreEmbauche : proposition
+
+' --- Selection ---
+Candidature "1" o-- "0..*" Entretien : planifie
+Collaborateur "1" -- "0..*" Entretien : anime
+
+Candidature "1" o-- "0..*" CommentaireCandidature : commentaires
+Collaborateur "1" -- "0..*" CommentaireCandidature : redige
+
+Candidature "1" o-- "0..*" EvaluationRecruteur : evalue
+Collaborateur "1" -- "0..*" EvaluationRecruteur : attribue
+
+Candidature "1" o-- "0..*" Notification : alertes
+
+' --- Evaluation ---
+OffreEmploi "1" o-- "0..*" QuizPreselection : quiz
+QuizPreselection "1" *-- "1..*" QuestionQuiz : contient
+
+Candidature "1" o-- "0..*" ResultatQuiz : resultats
+QuizPreselection "1" -- "0..*" ResultatQuiz : evalue
+
+' --- Plateforme (audit transversal) ---
+TraceActivite ..> Societe : audite
+TraceActivite ..> Collaborateur : auteur
+TraceActivite ..> Candidature : audite
+MessageContact ..> AdminPlateforme : traite
+
+'====================================================
+' NOTES
+'====================================================
+
+note right of Societe
+  **Societe -- Candidat** (association simple)
+  Rattachement multi-tenant (CompanyId).
+  Pas de composition : cycle de vie independant.
+end note
+
+note bottom of OffreEmbauche
+  **Concept metier** (pas une table separee).
+  Code : OfferLetterContent sur Candidature.
+  Salaire : parametre a la generation, non stocke.
+  Accepter / refuser via changerStatut().
+end note
+
+note bottom of Candidature
+  **Agregat central** du recrutement.
+  lancerAnalyseIA() : declenchement **manuel**
+  par le recruteur.
+  gererPropositionEmbauche() : generation + envoi offre.
+end note
+
+note bottom of CommentaireCandidature
+  Fil de discussion via idCommentaireParent
+  (pas d auto-association UML).
+end note
+
+note bottom of StatutCandidature
+  Preselection = Shortlisted
+  Entretien_realise = Interviewed
+  Offre_envoyee = OfferSent
+end note
+
+@enduml

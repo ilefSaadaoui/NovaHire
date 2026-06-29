@@ -123,11 +123,21 @@
                         :options="industryOptions"
                         :placeholder="'Sélectionner...'"
                         class="premium-select"
-                        @change="validateField('industry')"
+                        @change="onIndustryChange"
                       ></PremiumSelect>
                     </div>
                   </div>
                   <span v-if="errors.industry" class="field-error">{{ errors.industry }}</span>
+                </div>
+
+                <!-- Custom other industry input -->
+                <div v-if="formData.industry === 'other'" class="field custom-other-field" :class="{ 'has-error': errors.customIndustry }">
+                  <div class="label-row"><label>Précisez votre secteur</label></div>
+                  <div class="input-shell">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    <input type="text" v-model="formData.customIndustry" placeholder="Ex: Aéronautique, Agriculture..." @input="validateField('customIndustry')" />
+                  </div>
+                  <span v-if="errors.customIndustry" class="field-error">{{ errors.customIndustry }}</span>
                 </div>
 
                 <div class="field" :class="{ 'has-error': errors.employees }">
@@ -242,13 +252,13 @@
                 </div>
               </div>
 
-            <div class="legal-accept">
-              <label class="custom-check-celestial">
-                <input type="checkbox" v-model="formData.agreeToTerms" />
-                <span class="check-box"></span>
-                <span>J'accepte les <a href="#" class="legal-link">conditions d'utilisation</a></span>
-              </label>
-            </div>
+             <div class="legal-accept">
+               <label class="custom-check-celestial">
+                 <input type="checkbox" v-model="formData.agreeToTerms" />
+                 <span class="check-box"></span>
+                 <span>J'accepte les <a href="#" @click.prevent="showTermsModal = true" class="legal-link">conditions d'utilisation</a></span>
+               </label>
+             </div>
 
             <div class="form-footer-actions dual">
               <button type="button" @click="currentStep = 2" class="btn-outline-celestial">Retour</button>
@@ -263,6 +273,51 @@
         </div>
       </div>
     </div>
+
+    <!-- TERMS OF SERVICE MODAL -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="showTermsModal" class="terms-overlay">
+          <div class="terms-modal" @click.stop>
+            <div class="terms-header">
+              <div class="terms-header-left">
+                <div class="terms-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </div>
+                <div>
+                  <h3 class="terms-title">Conditions d'Utilisation</h3>
+                  <p class="terms-subtitle">Contrat de services de la plateforme NovaHire</p>
+                </div>
+              </div>
+              <button class="terms-close" @click="showTermsModal = false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <div class="terms-body">
+              <h4>1. Acceptation des conditions</h4>
+              <p>En créant un compte sur NovaHire, vous acceptez d'être lié par les présentes conditions générales d'utilisation, l'ensemble des lois et règlements applicables, et acceptez que vous êtes responsable du respect de toutes les lois locales applicables.</p>
+              
+              <h4>2. Utilisation de la plateforme</h4>
+              <p>NovaHire fournit un outil de recrutement intelligent facilitant la gestion des offres d'emploi, la réception et l'analyse de candidatures ainsi que le scoring et l'évaluation technique des candidats.</p>
+              
+              <h4>3. Confidentialité et Protection des Données (RGPD &amp; Loi Tunisienne n° 2004-63)</h4>
+              <p>Conformément au Règlement Général sur la Protection des Données (RGPD) et à la loi organique tunisienne n° 2004-63 du 27 juillet 2004 portant sur la protection des données à caractère personnel, les informations des candidats recueillies sur NovaHire sont traitées de manière hautement sécurisée. En tant qu'entreprise utilisatrice, vous vous engagez à respecter le droit à l'information, d'accès, de rectification, d'opposition et de suppression des données personnelles des candidats à tout moment.</p>
+              
+              <h4>4. Propriété intellectuelle</h4>
+              <p>L'ensemble des technologies d'évaluation automatique, des interfaces, du design et du code source de la plateforme NovaHire demeurent la propriété exclusive de NovaHire.</p>
+
+              <h4>5. Limitation de responsabilité</h4>
+              <p>NovaHire s'efforce de maximiser la pertinence et la précision des rapports. Toutefois, les indicateurs fournis constituent une aide à la décision. Le choix final d'embauche relève de la responsabilité exclusive de l'entreprise.</p>
+            </div>
+
+            <div class="terms-footer">
+              <button class="terms-btn-accept" @click="acceptTermsFromModal">J'ai lu et j'accepte</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -285,6 +340,7 @@ export default {
       formData: {
         companyName: '',
         industry: '',
+        customIndustry: '',
         employees: '',
         adminFirstName: '',
         adminLastName: '',
@@ -294,9 +350,11 @@ export default {
         recruiterEmail: '',
         agreeToTerms: false
       },
+      showTermsModal: false,
       errors: {
         companyName: '',
         industry: '',
+        customIndustry: '',
         employees: '',
         adminFirstName: '',
         adminLastName: '',
@@ -319,10 +377,16 @@ export default {
     },
     industryOptions() {
       return [
-        { value: 'tech', label: 'Technologie' },
-        { value: 'finance', label: 'Finance' },
-        { value: 'healthcare', label: 'Santé' },
-        { value: 'other', label: 'Autre' }
+        { value: 'tech', label: 'Technologie & IT' },
+        { value: 'finance', label: 'Finance, Banque & Assurances' },
+        { value: 'healthcare', label: 'Santé & Pharmaceutique' },
+        { value: 'education', label: 'Éducation & Formation' },
+        { value: 'btp', label: 'BTP & Construction' },
+        { value: 'commerce', label: 'Commerce, Vente & Distribution' },
+        { value: 'transport', label: 'Transport, Logistique & Supply Chain' },
+        { value: 'marketing', label: 'Marketing, Média & Communication' },
+        { value: 'rh', label: 'Ressources Humaines & Conseil' },
+        { value: 'other', label: 'Autre (Préciser)' }
       ]
     },
     employeesOptions() {
@@ -347,13 +411,30 @@ export default {
         this.parallaxY = (e.clientY - window.innerHeight / 2) / -50;
       }
     },
+    onIndustryChange() {
+      if (this.formData.industry !== 'other') {
+        this.formData.customIndustry = ''
+        this.errors.customIndustry = ''
+      }
+      this.validateField('industry')
+    },
+    acceptTermsFromModal() {
+      this.formData.agreeToTerms = true
+      this.showTermsModal = false
+    },
     goToStep2() {
       this.validateField('companyName')
       this.validateField('industry')
+      if (this.formData.industry === 'other') {
+        this.validateField('customIndustry')
+      }
       this.validateField('employees')
 
-      if (this.formData.companyName && this.formData.industry && this.formData.employees && 
-          !this.errors.companyName && !this.errors.industry && !this.errors.employees) {
+      const hasIndustryError = this.formData.industry === 'other' ? !!this.errors.customIndustry : !!this.errors.industry
+      const isIndustryFilled = this.formData.industry === 'other' ? !!this.formData.customIndustry : !!this.formData.industry
+
+      if (this.formData.companyName && isIndustryFilled && this.formData.employees && 
+          !this.errors.companyName && !hasIndustryError && !this.errors.employees) {
         this.currentStep = 2
         this.errorMessage = ''
       } else {
@@ -396,6 +477,13 @@ export default {
         case 'employees':
           this.errors[field] = val ? '' : 'Ce champ est requis'
           break
+        case 'customIndustry':
+          if (this.formData.industry === 'other' && !val) {
+            this.errors.customIndustry = 'Veuillez préciser votre secteur'
+          } else {
+            this.errors.customIndustry = ''
+          }
+          break
         case 'adminFirstName':
         case 'adminLastName':
           if (!nameRegex.test(val)) this.errors[field] = 'Lettres uniquement'
@@ -431,9 +519,13 @@ export default {
       this.errorMessage = ''
       
       try {
+        const selectedIndustry = this.formData.industry === 'other' 
+          ? this.formData.customIndustry 
+          : this.industryOptions.find(o => o.value === this.formData.industry)?.label || this.formData.industry
+
         const payload = { 
           companyName: this.formData.companyName,
-          industry: this.formData.industry,
+          industry: selectedIndustry,
           employeesRange: this.formData.employees,
           adminFirstName: this.formData.adminFirstName,
           adminLastName: this.formData.adminLastName,
@@ -883,12 +975,28 @@ export default {
   color: #ffffff !important;
 }
 
-/* DROPDOWN MENU overrides for Register form */
 :deep(.premium-select-menu) {
   background: #111822 !important; /* Extremely dark solid background instead of transparent */
   border: 1px solid rgba(255,255,255,0.1) !important;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8) !important;
   top: calc(100% + 4px) !important;
+  max-height: 220px !important;
+  overflow-y: auto !important;
+  z-index: 99999 !important;
+}
+/* Custom Scrollbar for Options Dropdown */
+:deep(.premium-select-menu)::-webkit-scrollbar {
+  width: 6px !important;
+}
+:deep(.premium-select-menu)::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+:deep(.premium-select-menu)::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 10px !important;
+}
+:deep(.premium-select-menu)::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
 }
 :deep(.premium-option) {
   color: rgba(255,255,255,0.85) !important;
@@ -1041,5 +1149,330 @@ export default {
   .stepper-celestial { padding: 0; }
   .btn-back-celestial { margin-bottom: 24px; }
   .form-footer-actions.dual { grid-template-columns: 1fr; gap: 12px; }
+}
+/* TERMS OF SERVICE MODAL CSS */
+.terms-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: auto !important;
+}
+
+.terms-overlay * {
+  pointer-events: auto !important;
+}
+
+.terms-modal {
+  background: #0f172a;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.6);
+  width: 100%;
+  max-width: 600px;
+  overflow: hidden;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.terms-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.terms-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.terms-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(0, 167, 225, 0.1);
+  color: #00A7E1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.terms-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 850;
+  color: white;
+}
+
+.terms-subtitle {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.terms-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.terms-close:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.terms-body {
+  padding: 24px;
+  overflow-y: auto;
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Custom Scrollbar for Terms Body */
+.terms-body::-webkit-scrollbar {
+  width: 6px;
+}
+.terms-body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+}
+.terms-body::-webkit-scrollbar-thumb {
+  background: rgba(129, 140, 248, 0.5);
+  border-radius: 10px;
+}
+.terms-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 140, 248, 0.85);
+}
+
+.terms-body h4 {
+  color: white;
+  margin-top: 20px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.terms-body p {
+  margin: 0 0 16px 0;
+}
+
+.terms-footer {
+  padding: 20px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.terms-btn-accept {
+  padding: 12px 24px;
+  background: #00A7E1;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.terms-btn-accept:hover {
+  background: #008cc0;
+}
+
+.custom-other-field {
+  grid-column: 1 / -1;
+  animation: slideUp 0.3s ease-out;
+}
+
+/* ─── LIGHT MODE OVERRIDES ─── */
+:global(body:not(.dark-mode) .auth-celestial) {
+  background: #f4f7fe !important;
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .welcome-desc) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .trust-item) {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .trust-text strong) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .trust-text span) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .glass-panel) {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+}
+:global(body:not(.dark-mode) .btn-back-celestial) {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #00A7E1;
+}
+:global(body:not(.dark-mode) .btn-back-celestial:hover) {
+  background: rgba(0, 0, 0, 0.06);
+  color: #008cc0;
+}
+:global(body:not(.dark-mode) .card-header h2) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .card-header p) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .field label) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .input-shell input) {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .input-shell input::placeholder) {
+  color: rgba(0, 0, 0, 0.45);
+}
+:global(body:not(.dark-mode) .input-shell svg) {
+  color: rgba(0, 0, 0, 0.4);
+}
+:global(body:not(.dark-mode) .stepper-celestial) {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .step-dot) {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .step-segment.current .step-dot) {
+  background: rgba(0, 167, 225, 0.08);
+  color: #00A7E1;
+  border-color: rgba(0, 167, 225, 0.3);
+}
+:global(body:not(.dark-mode) .step-segment.active:not(.current) .step-dot) {
+  background: rgba(16, 185, 129, 0.08);
+  color: #10B981;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+:global(body:not(.dark-mode) .step-txt) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .step-segment.active .step-txt) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .step-line) {
+  background: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .step-title-final) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .step-desc-final) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .custom-check-celestial) {
+  color: #334155;
+}
+:global(body:not(.dark-mode) .check-box) {
+  border-color: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.02);
+}
+:global(body:not(.dark-mode) .custom-check-celestial input:checked + .check-box) {
+  background: #00A7E1;
+  border-color: #00A7E1;
+}
+:global(body:not(.dark-mode) .btn-outline-celestial) {
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #334155;
+}
+:global(body:not(.dark-mode) .btn-outline-celestial:hover) {
+  background: rgba(0, 0, 0, 0.04);
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+/* Plan Card Styles for Light Mode */
+:global(body:not(.dark-mode) .plan-card-h) {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .plan-card-h:hover) {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+:global(body:not(.dark-mode) .plan-card-h.selected) {
+  background: rgba(247, 201, 2, 0.08);
+  border-color: rgba(247, 201, 2, 0.5);
+}
+:global(body:not(.dark-mode) .plan-icon-h) {
+  background: rgba(0, 0, 0, 0.04);
+}
+:global(body:not(.dark-mode) .plan-icon-h svg) {
+  color: #64748b;
+}
+:global(body:not(.dark-mode) .plan-info-h strong) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .plan-info-h span) {
+  color: #475569;
+}
+
+/* Premium Select Light Mode overrides */
+:global(body:not(.dark-mode) .select-shell .premium-select-wrapper) {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+:global(body:not(.dark-mode) .select-shell .premium-select-wrapper.is-open),
+:global(body:not(.dark-mode) .select-shell .premium-select-wrapper:hover) {
+  border-color: rgba(0, 167, 225, 0.5) !important;
+  background: rgba(0, 167, 225, 0.06) !important;
+}
+:global(body:not(.dark-mode) .select-shell .placeholder-text) {
+  color: rgba(0, 0, 0, 0.45) !important;
+}
+:global(body:not(.dark-mode) .select-shell .selected-text) {
+  color: #0f172a !important;
+}
+:global(body:not(.dark-mode) .select-shell .dropdown-icon) {
+  color: rgba(0, 0, 0, 0.4) !important;
+}
+:global(body:not(.dark-mode) .select-shell .premium-select-wrapper.is-open .dropdown-icon) {
+  color: #00A7E1 !important;
+}
+:global(body:not(.dark-mode) .premium-select-menu) {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+}
+:global(body:not(.dark-mode) .premium-option) {
+  color: #0f172a !important;
+}
+:global(body:not(.dark-mode) .premium-option:hover) {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #000000 !important;
+}
+:global(body:not(.dark-mode) .premium-option.is-selected) {
+  background: rgba(0, 167, 225, 0.08) !important;
+  color: #00A7E1 !important;
+}
+:global(body:not(.dark-mode) .premium-option.is-selected .check-icon) {
+  color: #00A7E1 !important;
 }
 </style>

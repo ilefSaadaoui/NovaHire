@@ -1,0 +1,73 @@
+# ============================================================
+# NovaHire — render.yaml (Infrastructure as Code)
+# Déploie les 2 services backend sur Render automatiquement
+# ============================================================
+
+services:
+  # ── Service AI Python ─────────────────────────────────────
+  - type: web
+    name: novahire-ai
+    runtime: docker
+    dockerfilePath: ./Backend/src/AI/Dockerfile
+    dockerContext: ./Backend/src/AI
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    envVars:
+      - key: NOVAHIRE_GROQ_API_KEY
+        sync: false   # À renseigner manuellement dans le dashboard Render
+      - key: NOVAHIRE_OLLAMA_URL
+        value: ""     # Ollama non disponible sur Render cloud
+      - key: PORT
+        value: 8000
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MAX_CPU_WORKERS
+        value: "2"
+
+  # ── Backend .NET API ──────────────────────────────────────
+  - type: web
+    name: novahire-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:5000
+      - key: ConnectionStrings__PostgreSQL
+        sync: false   # À renseigner : URL Neon.tech
+      - key: JwtSettings__SecretKey
+        sync: false   # Clé JWT sécurisée (générez une chaîne aléatoire de 64 chars)
+      - key: JwtSettings__Issuer
+        value: RecruitmentSAAS
+      - key: JwtSettings__Audience
+        value: RecruitmentSAAS-Users
+      - key: AppSettings__FrontendUrl
+        sync: false   # À renseigner : URL Vercel (ex: https://novahire.vercel.app)
+      - key: AISettings__PythonServiceUrl
+        sync: false   # À renseigner : URL du service AI Render
+      - key: EmailSettings__SmtpHost
+        value: smtp.gmail.com
+      - key: EmailSettings__SmtpPort
+        value: "465"
+      - key: EmailSettings__SenderEmail
+        value: novahire7@gmail.com
+      - key: EmailSettings__Username
+        value: novahire7@gmail.com
+      - key: EmailSettings__Password
+        sync: false   # Mot de passe app Gmail (à garder secret)
+      - key: EmailSettings__EnableSsl
+        value: "true"
+      - key: CloudinarySettings__CloudName
+        value: dpnckzra5
+      - key: CloudinarySettings__ApiKey
+        value: "744956851213189"
+      - key: CloudinarySettings__ApiSecret
+        sync: false   # À renseigner manuellement
+
+databases: []

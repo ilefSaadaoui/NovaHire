@@ -42,10 +42,9 @@
                 :totalAnalyses="totalAnalyses" 
               />
 
-              <!-- SKILLS GALAXY -->
-              <ReportSkillsGalaxy 
-                :topSkills="stats.topSkills" 
-                :maxSkillCount="maxSkillCount" 
+              <!-- TOP OFFERS -->
+              <ReportTopOffers 
+                :topOffers="stats.topOffers" 
               />
             </div>
           </div>
@@ -67,7 +66,7 @@ import ReportKPIGrid from '@/components/recruiter/reports/ReportKPIGrid.vue'
 import ReportEmptyState from '@/components/recruiter/reports/ReportEmptyState.vue'
 import ReportPipeline from '@/components/recruiter/reports/ReportPipeline.vue'
 import ReportScoreDonut from '@/components/recruiter/reports/ReportScoreDonut.vue'
-import ReportSkillsGalaxy from '@/components/recruiter/reports/ReportSkillsGalaxy.vue'
+import ReportTopOffers from '@/components/recruiter/reports/ReportTopOffers.vue'
 
 import { useAuthStore } from '@/stores/authStore'
 import { useToastStore } from '@/stores/toastStore'
@@ -87,7 +86,8 @@ const stats = ref({
   kpis: [],
   pipelineData: [],
   scoreRanges: [],
-  topSkills: []
+  topSkills: [],
+  topOffers: []
 })
 
 const offerOptions = computed(() => {
@@ -98,10 +98,6 @@ const kpis = computed(() => stats.value.kpis || [])
 const pipelineData = computed(() => stats.value.pipelineData || [])
 const scoreRanges = computed(() => stats.value.scoreRanges || [])
 const totalAnalyses = computed(() => scoreRanges.value.reduce((acc, curr) => acc + curr.count, 0))
-const maxSkillCount = computed(() => {
-  if (!stats.value.topSkills?.length) return 1
-  return Math.max(...stats.value.topSkills.map(s => s.count))
-})
 
 const fetchOffers = async () => {
   try {

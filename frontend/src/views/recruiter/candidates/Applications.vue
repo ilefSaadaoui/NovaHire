@@ -48,12 +48,13 @@
               <button 
                 v-if="compareMode && selectedForComparison.length > 0" 
                 class="launch-battle-btn-elite" 
-                :disabled="selectedForComparison.length < 2"
-                @click="showComparisonModal = true"
+                :disabled="!canLaunchBattleComparison"
+                :title="battleCompareButtonTitle"
+                @click="launchBattleComparison"
               >
                 <div class="btn-content">
-                  <span class="btn-text">COMPARER LES TALENTS</span>
-                  <div class="btn-badge">{{ selectedForComparison.length }}</div>
+                  <span class="btn-text">COMPARER 2 CANDIDATS</span>
+                  <div class="btn-badge">{{ selectedForComparison.length }}/2</div>
                 </div>
                 <div class="btn-glow"></div>
               </button>
@@ -71,7 +72,7 @@
 
           <button v-if="selectedOfferId" class="btn-quiz-toolbar anim-reveal-left" @click="showQuizModal = true">
             <div class="icon-pulse-gold">
-              <i class="fas fa-vial"></i>
+              <FlaskConical :size="16" stroke-width="2.5" />
             </div>
             <span>Gérer Quiz IA</span>
           </button>
@@ -123,8 +124,13 @@
                 @dragend="handleDragEnd"
               >
                 <div class="card-top" style="display: flex; gap: 12px; margin-bottom: 12px;">
-                  <div v-if="compareMode" class="card-selection-check" @click.stop="toggleCandidateSelection(c)">
-                    <div class="check-box" :class="{ checked: isSelected(c.id) }">
+                  <div
+                    v-if="compareMode"
+                    class="card-selection-check"
+                    :class="{ 'selection-disabled': isCompareSelectionDisabled(c.id) }"
+                    @click.stop="toggleCandidateSelection(c)"
+                  >
+                    <div class="check-box" :class="{ checked: isSelected(c.id), disabled: isCompareSelectionDisabled(c.id) }">
                       <Check v-if="isSelected(c.id)" :size="14" />
                     </div>
                   </div>
@@ -152,7 +158,7 @@
                   </div>
                   
                   <div v-if="c.quizScore !== null && c.quizScore !== undefined" class="quiz-badge-mini" title="Score Quiz IA">
-                    <i class="fas fa-vial"></i>
+                    <FlaskConical :size="12" stroke-width="2.5" />
                     <span>{{ c.quizScore }}%</span>
                   </div>
                 </div>
@@ -180,8 +186,13 @@
                       <X :size="14" stroke-width="3" />
                     </button>
                     
-                    <button class="action-btn small info" @click.stop="openQuizForCandidate(c)" title="Envoyer Quiz IA">
-                      <i class="fas fa-vial" style="font-size: 12px;"></i>
+                    <button 
+                      v-if="col.id !== 'rejected' && col.id !== 'accepted' && col.id !== 'offersent'"
+                      class="action-btn small info" 
+                      @click.stop="openQuizForCandidate(c)" 
+                      title="Envoyer Quiz IA"
+                    >
+                      <FlaskConical :size="14" stroke-width="2.5" />
                     </button>
                   </div>
                 </div>
@@ -203,8 +214,13 @@
           </div>
           
           <div v-for="c in allCandidates" :key="c.id" class="list-item-premium" :class="{ 'selected-for-battle': isSelected(c.id) }" @click="openCandidate(c)">
-            <div v-if="compareMode" class="col-selection" @click.stop="toggleCandidateSelection(c)">
-              <div class="check-box" :class="{ checked: isSelected(c.id) }">
+            <div
+              v-if="compareMode"
+              class="col-selection"
+              :class="{ 'selection-disabled': isCompareSelectionDisabled(c.id) }"
+              @click.stop="toggleCandidateSelection(c)"
+            >
+              <div class="check-box" :class="{ checked: isSelected(c.id), disabled: isCompareSelectionDisabled(c.id) }">
                 <Check v-if="isSelected(c.id)" :size="14" />
               </div>
             </div>
@@ -228,7 +244,7 @@
 
             <div class="col-quiz">
               <div v-if="c.quizScore !== null && c.quizScore !== undefined" class="quiz-badge-mini list-v">
-                <i class="fas fa-vial"></i>
+                <FlaskConical :size="12" stroke-width="2.5" />
                 <span>{{ c.quizScore }}%</span>
               </div>
               <span v-else class="score-pending-sm">—</span>
@@ -320,7 +336,8 @@
 
       <InterviewModal 
         v-if="showInterviewModal"
-        v-model:form="interviewForm"
+        :form="interviewForm"
+        @update:form="val => interviewForm = val"
         :loading="sendingInterview"
         @close="showInterviewModal = false"
         @save="confirmScheduleInterview"
@@ -336,50 +353,50 @@
       />
 
       <!-- Rejection Email Modal -->
-      <div v-if="showRejectionModal" class="modal-overlay" @click="showRejectionModal = false">
-        <div class="modal-content premium-modal" style="max-width: 500px;" @click.stop>
-          <div class="modal-header">
-            <div class="header-with-icon">
-              <div class="icon-box-themed danger" style="width: 48px; height: 48px; border-radius: 14px; background: rgba(244, 63, 94, 0.1); color: #f43f5e; display: flex; align-items: center; justify-content: center;">
-                <X :size="24" stroke-width="3" />
+      <Teleport to="body">
+        <Transition name="modal-fade">
+          <div v-if="showRejectionModal" class="rejection-overlay" @click="cancelRejection">
+            <div class="rejection-modal" @click.stop>
+              <!-- Header -->
+              <div class="rej-header">
+                <div class="rej-header-left">
+                  <div class="rej-icon">
+                    <X :size="22" stroke-width="3" />
+                  </div>
+                  <div class="rej-header-text">
+                    <h3 class="rej-title">Refuser la candidature</h3>
+                    <p class="rej-subtitle">Email de refus pour <strong>{{ selectedCandidateName }}</strong></p>
+                  </div>
+                </div>
+                <button class="rej-close" @click="cancelRejection">
+                  <X :size="18" stroke-width="2.5" />
+                </button>
               </div>
-              <div>
-                <h3 style="margin: 0; font-size: 18px;">Refuser la candidature</h3>
-                <p style="margin: 0; font-size: 12px; color: var(--r-text-sub);">Envoyer un email de refus constructif à {{ selectedCandidateName }}</p>
+
+              <!-- Body -->
+              <div class="rej-body">
+                <label class="rej-label">Motif du refus <span class="rej-label-opt">(optionnel)</span></label>
+                <textarea
+                  v-model="rejectionReason"
+                  class="rej-textarea"
+                  rows="5"
+                  placeholder="Ex: Profil trop junior, manque d'expérience sur React..."
+                ></textarea>
+                <p class="rej-hint">Ce message sera inclus dans l'email envoyé au candidat.</p>
+              </div>
+
+              <!-- Footer -->
+              <div class="rej-footer">
+                <button class="rej-btn-cancel" @click="cancelRejection">Annuler</button>
+                <button class="rej-btn-confirm" @click="confirmRejection" :disabled="isSendingRejection">
+                  <X v-if="!isSendingRejection" :size="15" stroke-width="3" />
+                  <span>{{ isSendingRejection ? 'Envoi en cours...' : 'Confirmer et envoyer' }}</span>
+                </button>
               </div>
             </div>
-            <div class="ai-toggle-feedback anim-reveal-right">
-              <label class="premium-switch">
-                <input type="checkbox" v-model="useAI">
-                <span class="slider"></span>
-              </label>
-              <span class="toggle-label">✨ Sublimer par l'IA</span>
-            </div>
           </div>
-          <div class="modal-body" style="padding-top: 20px;">
-            <div class="form-group">
-              <label style="display: block; font-size: 13px; font-weight: 700; margin-bottom: 8px;">Notes de feedback (pour l'IA ou direct)</label>
-              <textarea v-model="rejectionReason" rows="5" 
-                placeholder="Ex: Manque d'expérience sur React, Profil trop junior..." 
-                style="width: 100%; border-radius: 12px; padding: 14px; background: var(--r-main-bg); color: var(--r-text-main); border: 1px solid var(--r-border); font-family: inherit; font-size: 14px; outline: none; transition: 0.3s; resize: none;"
-              ></textarea>
-              <p v-if="useAI" style="font-size: 11px; color: var(--accent-color); margin-top: 8px;">
-                <Zap :size="10" /> L'IA rédigera un email bienveillant en intégrant vos notes.
-              </p>
-              <p v-else style="font-size: 11px; color: var(--r-text-sub); margin-top: 8px;">
-                Le texte ci-dessus sera envoyé tel quel.
-              </p>
-            </div>
-          </div>
-          <div class="modal-footer" style="padding-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
-            <button class="btn-premium btn-secondary" @click="cancelRejection">Annuler</button>
-            <button class="btn-luxury danger" @click="confirmRejection" :disabled="isSendingRejection">
-              <span v-if="!isSendingRejection">Confirmer et Envoyer l'Email</span>
-              <span v-else>Envoi en cours...</span>
-            </button>
-          </div>
-        </div>
-      </div>
+        </Transition>
+      </Teleport>
     </main>
   </div>
 </template>
@@ -389,7 +406,7 @@ import Sidebar from '@/components/layout/Sidebar.vue'
 import { 
   Users, Columns, List, Sparkles, 
   FileEdit, Clock, ChevronRight, Check, 
-  Trash2, Search, X, Zap, Download, Calendar, RefreshCw
+  Trash2, Search, X, Zap, Download, Calendar, RefreshCw, FlaskConical, Sword
 } from 'lucide-vue-next'
 import InterviewModal from '@/components/recruiter/modals/InterviewModal.vue'
 import QuizManagementModal from '@/components/recruiter/quiz/QuizManagementModal.vue'
@@ -401,7 +418,7 @@ import { useRecruitmentStore } from '@/stores/recruitmentStore'
 import { useToastStore } from '@/stores/toastStore'
 import api from '@/api/axios'
 import ComparisonModal from '@/components/recruiter/ComparisonModal.vue'
-import { Sword } from 'lucide-vue-next'
+
 
 export default {
   name: 'Applications',
@@ -409,7 +426,7 @@ export default {
     Sidebar, PremiumSelect,
     Users, Columns, List, Sparkles, 
     FileEdit, Clock, ChevronRight, Check, 
-    Trash2, Search, X, Zap, Download, Calendar, Sword, RefreshCw,
+    Trash2, Search, X, Zap, Download, Calendar, Sword, RefreshCw, FlaskConical,
     InterviewModal, ComparisonModal, QuizManagementModal
   },
   data() {
@@ -459,8 +476,9 @@ export default {
       draggedCandidate: null,
       draggedFromColId: null,
       activeDropZone: null,
-      // Battle Mode Selection
+      // Battle Mode Selection (exactement 2 candidats)
       compareMode: false,
+      maxCompareCandidates: 2,
       selectedForComparison: [],
       showComparisonModal: false,
       // Rejection state
@@ -468,7 +486,7 @@ export default {
       rejectionReason: '',
       isSendingRejection: false,
       pendingRejection: null,
-      useAI: true
+      useAI: false
     }
   },
   async mounted() {
@@ -485,6 +503,24 @@ export default {
     },
     allCandidates() {
       return this.columns.flatMap(col => col.candidates)
+    },
+    canLaunchBattleComparison() {
+      if (this.selectedForComparison.length !== this.maxCompareCandidates) return false
+      return this.selectedForComparison.every(id => {
+        const c = this.allCandidates.find(x => x.id === id)
+        return c && this.hasAiAnalysis(c)
+      })
+    },
+    battleCompareButtonTitle() {
+      if (this.selectedForComparison.length !== this.maxCompareCandidates) {
+        return 'Sélectionnez exactement 2 candidats'
+      }
+      const missing = this.selectedForComparison
+        .map(id => this.allCandidates.find(x => x.id === id))
+        .filter(c => c && !this.hasAiAnalysis(c))
+      if (missing.length === 0) return 'Comparer les scores IA des 2 candidats'
+      const names = missing.map(c => c.name).join(', ')
+      return `Analyse IA requise pour : ${names}`
     },
     sidebarVars() {
       // Returned empty as Sidebar handles vars via its internal setup and global CSS
@@ -552,7 +588,7 @@ export default {
             initials: (app.firstName[0] + (app.lastName[0] || '')).toUpperCase(),
             role: app.role || 'Candidat',
             skills: app.skills || [],
-            score: app.score || app.aiScore,
+            score: app.score ?? app.aiScore ?? null,
             quizScore: app.quizScore,
             quizSent: app.quizSent,
             quizExpiresAt: app.quizExpiresAt,
@@ -593,11 +629,11 @@ export default {
       if (this.compareMode || this.showComparisonModal) return
       this.$router.push(`/applications/profile/${c.id}`)
     },
-    async moveCard(candidate, fromColId, toColId) {
+    async moveCard(candidate, fromColId, toColId, skipRejectionModal = false) {
       if (fromColId === toColId) return
 
-      // Intercept rejection
-      if (toColId === 'rejected' && !this.showRejectionModal) {
+      // Intercept rejection (unless bypassed, e.g. for AI auto-reject)
+      if (toColId === 'rejected' && !skipRejectionModal && !this.showRejectionModal) {
         this.selectedCandidateName = candidate.name
         this.pendingRejection = { candidate, fromColId, toColId }
         this.showRejectionModal = true
@@ -727,15 +763,24 @@ export default {
       try {
         const res = await api.post(`/recruiter/applications/${candidate.id}/analyze`, {}, { timeout: 600000 })
         candidate.score = res.data.score
-        
-        // Move to Évaluation automatically after analysis
-        if (candidate.stage === 'submitted') {
-          this.moveCard(candidate, 'submitted', 'underreview')
-        }
 
-        // Show success notification
+        // Determine target column from backend-returned status
+        const backendStatus = res.data.status  // integer enum value
+        const targetStage = this.mapStatusToId(backendStatus)
         const toast = useToastStore()
-        toast.success(`Analyse de ${candidate.firstName} terminée. Passage à l'état : Analysée IA.`)
+
+        if (targetStage && targetStage !== candidate.stage) {
+          if (targetStage === 'rejected') {
+            // Auto-rejection: bypass the manual rejection modal (status already saved by backend)
+            await this.moveCard(candidate, candidate.stage, 'rejected', true)
+            toast.error(`Candidat automatiquement rejeté — score IA ${candidate.score}% inférieur au seuil configuré.`)
+          } else {
+            await this.moveCard(candidate, candidate.stage, targetStage)
+            toast.success(`Analyse terminée — score : ${candidate.score}%. Candidat déplacé en « ${this.getStageName(targetStage)} ».`)
+          }
+        } else {
+          toast.success(`Analyse terminée — score : ${candidate.score}%.`)
+        }
       } catch (err) {
         console.error('Erreur analyse:', err)
         const toast = useToastStore()
@@ -779,6 +824,27 @@ export default {
       this.showInterviewModal = true
       setTimeout(() => this.generateEmailTemplate(), 0)
     },
+    parseDateInput(value) {
+      if (!value) return null
+      const normalized = String(value).trim()
+      const match = normalized.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/)
+      if (match) {
+        const day = Number(match[1])
+        const month = Number(match[2])
+        let year = Number(match[3])
+        if (year < 100) year += 2000
+        const date = new Date(year, month - 1, day)
+        if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+          return date
+        }
+      }
+      const parsed = new Date(normalized)
+      return isNaN(parsed.getTime()) ? null : parsed
+    },
+    formatLocalizedDate(value) {
+      const date = this.parseDateInput(value)
+      return date ? date.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : value
+    },
     generateEmailTemplate() {
       const name = this.selectedCandidateName || 'Candidat'
       const job = this.selectedOfferName || 'le poste'
@@ -786,6 +852,16 @@ export default {
       const typeLabel = typeLabels[this.interviewForm.type] || 'en visioconférence'
 
       this.interviewForm.subject = `Invitation à un entretien pour le poste : ${job}`
+
+      // Format date/time if available
+      let dateTimeInfo = ''
+      if (this.interviewForm.date || this.interviewForm.time) {
+        const datePart = this.interviewForm.date
+          ? this.formatLocalizedDate(this.interviewForm.date)
+          : '[date à confirmer]'
+        const timePart = this.interviewForm.time || '[heure à confirmer]'
+        dateTimeInfo = `\n\nDate : ${datePart}\nHeure : ${timePart}`
+      }
 
       let details = ''
       if (this.interviewForm.type === 'visio') {
@@ -796,18 +872,20 @@ export default {
         details = '\n\nAdresse :\n[Insérez l’adresse complète de vos bureaux ici]\n\nMerci de vous présenter à l’accueil 10 minutes avant l’heure prévue.'
       }
 
-      this.interviewForm.message = `Bonjour ${name},\n\nSuite à l’examen de votre candidature pour le poste de ${job}, nous avons le plaisir de vous informer que votre profil a retenu toute notre attention.\n\nNous souhaiterions vous rencontrer ${typeLabel} afin d’échanger sur votre parcours et vos motivations.${details}\n\nMerci de confirmer votre disponibilité en répondant à cet e-mail.\n\nCordialement`
+      this.interviewForm.message = `Bonjour ${name},\n\nSuite à l’examen de votre candidature pour le poste de ${job}, nous avons le plaisir de vous informer que votre profil a retenu toute notre attention.\n\nNous souhaiterions vous rencontrer ${typeLabel} afin d’échanger sur votre parcours et vos motivations.${dateTimeInfo}${details}\n\nMerci de confirmer votre disponibilité en répondant à cet e-mail.\n\nCordialement`
     },
     async confirmScheduleInterview() {
       this.sendingInterview = true
       try {
-        await api.post(`/recruiter/applications/${this.selectedApplicationId}/interviews`, {
+        const payload = {
           date: this.interviewForm.date,
           time: this.interviewForm.time,
           type: this.interviewForm.type,
           subject: this.interviewForm.subject,
           message: this.interviewForm.message
-        })
+        }
+        console.debug('Interview request payload:', payload)
+        await api.post(`/recruiter/applications/${this.selectedApplicationId}/interviews`, payload)
         this.showInterviewModal = false
         const candidate = this.allCandidates.find(c => c.id === this.selectedApplicationId)
         if (candidate) {
@@ -816,9 +894,12 @@ export default {
         const toast = useToastStore()
         toast.success('Invitation d\'entretien envoyée avec succès !')
       } catch (err) {
-        console.error('Erreur planification entretien:', err)
+        const response = err?.response
+        const data = response?.data
+        const message = data?.message || (typeof data === 'string' ? data : JSON.stringify(data)) || err?.message || 'Erreur lors de l\'envoi de l\'invitation.'
+        console.error('Erreur planification entretien:', { status: response?.status, data, message, error: err })
         const toast = useToastStore()
-        toast.error('Erreur lors de l\'envoi de l\'invitation.')
+        toast.error(message)
       } finally {
         this.sendingInterview = false
       }
@@ -849,7 +930,8 @@ export default {
     toggleCandidateSelection(candidate) {
       const idx = this.selectedForComparison.indexOf(candidate.id)
       if (idx === -1) {
-        if (this.selectedForComparison.length >= 3) {
+        if (this.selectedForComparison.length >= this.maxCompareCandidates) {
+          useToastStore().show('Vous ne pouvez comparer que 2 candidats. Désélectionnez-en un pour en choisir un autre.', 'warning')
           return
         }
         this.selectedForComparison.push(candidate.id)
@@ -859,6 +941,34 @@ export default {
     },
     isSelected(id) {
       return this.selectedForComparison.includes(id)
+    },
+    isCompareSelectionDisabled(id) {
+      return (
+        this.compareMode &&
+        this.selectedForComparison.length >= this.maxCompareCandidates &&
+        !this.isSelected(id)
+      )
+    },
+    hasAiAnalysis(candidate) {
+      return candidate.score !== null && candidate.score !== undefined
+    },
+    launchBattleComparison() {
+      if (this.selectedForComparison.length !== this.maxCompareCandidates) {
+        useToastStore().show('Sélectionnez exactement 2 candidats à comparer.', 'warning')
+        return
+      }
+      const missing = this.selectedForComparison
+        .map(id => this.allCandidates.find(x => x.id === id))
+        .filter(c => c && !this.hasAiAnalysis(c))
+      if (missing.length > 0) {
+        const names = missing.map(c => c.name).join(' et ')
+        useToastStore().show(
+          `Analyse IA requise avant la comparaison. Lancez l'analyse CV pour : ${names}.`,
+          'warning'
+        )
+        return
+      }
+      this.showComparisonModal = true
     }
   },
   watch: {
@@ -1662,6 +1772,16 @@ export default {
   color: white;
 }
 
+.check-box.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.card-selection-check.selection-disabled,
+.col-selection.selection-disabled {
+  cursor: not-allowed;
+}
+
 .launch-battle-btn {
   animation: slideInRight 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
@@ -1757,60 +1877,250 @@ export default {
   .dashboard-layout { padding: 0; }
 }
 
-.ai-toggle-feedback {
+/* ===== REJECTION MODAL ===== */
+.rejection-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  padding: 24px;
 }
 
-.toggle-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--accent-color);
-}
-
-.premium-switch {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-}
-
-.premium-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--r-border);
-  transition: .4s;
+.rejection-modal {
+  background: var(--r-main-bg, #ffffff);
   border-radius: 20px;
+  border: 1px solid var(--r-border, rgba(0,0,0,0.08));
+  box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(244, 63, 94, 0.06);
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+  text-align: left;
 }
 
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 14px;
-  width: 14px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: .4s;
-  border-radius: 50%;
+.dark-mode .rejection-modal {
+  background: #0f172a;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.6);
 }
 
-input:checked + .slider {
-  background-color: var(--accent-color);
+/* Header */
+.rej-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 0 24px;
+  gap: 12px;
 }
 
-input:checked + .slider:before {
-  transform: translateX(20px);
+.rej-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rej-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(244, 63, 94, 0.1);
+  color: #f43f5e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(244, 63, 94, 0.15);
+}
+
+.dark-mode .rej-icon {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.2);
+}
+
+.rej-header-text { min-width: 0; }
+
+.rej-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--r-text-main, #1e293b);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dark-mode .rej-title { color: #f1f5f9; }
+
+.rej-subtitle {
+  margin: 3px 0 0 0;
+  font-size: 13px;
+  color: var(--r-text-sub, #64748b);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rej-subtitle strong { color: var(--r-text-main, #1e293b); font-weight: 700; }
+.dark-mode .rej-subtitle strong { color: #f1f5f9; }
+
+.rej-close {
+  background: transparent;
+  border: none;
+  color: var(--r-text-sub, #64748b);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.rej-close:hover {
+  background: rgba(244, 63, 94, 0.08);
+  color: #f43f5e;
+}
+
+/* Body */
+.rej-body {
+  padding: 20px 24px;
+}
+
+.rej-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--r-text-main, #1e293b);
+  margin-bottom: 10px;
+}
+
+.dark-mode .rej-label { color: #e2e8f0; }
+
+.rej-label-opt {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--r-text-sub, #94a3b8);
+}
+
+.rej-textarea {
+  width: 100%;
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--r-card-bg, #f8fafc);
+  color: var(--r-text-main, #1e293b);
+  border: 1.5px solid var(--r-border, #e2e8f0);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  resize: none;
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+
+.rej-textarea:focus {
+  border-color: #f43f5e;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.08);
+}
+
+.dark-mode .rej-textarea {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.1);
+  color: #f1f5f9;
+}
+
+.dark-mode .rej-textarea:focus {
+  border-color: #f43f5e;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12);
+}
+
+.rej-hint {
+  margin: 10px 0 0 0;
+  font-size: 12px;
+  color: var(--r-text-sub, #94a3b8);
+  line-height: 1.5;
+}
+
+/* Footer */
+.rej-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 24px 24px;
+}
+
+.rej-btn-cancel {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1.5px solid var(--r-border, #e2e8f0);
+  background: transparent;
+  color: var(--r-text-sub, #64748b);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.rej-btn-cancel:hover {
+  background: var(--r-card-bg, #f8fafc);
+  color: var(--r-text-main, #1e293b);
+  border-color: var(--r-text-sub, #94a3b8);
+}
+
+.dark-mode .rej-btn-cancel {
+  border-color: rgba(255,255,255,0.1);
+  color: #94a3b8;
+}
+
+.dark-mode .rej-btn-cancel:hover {
+  background: rgba(255,255,255,0.05);
+  color: #e2e8f0;
+}
+
+.rej-btn-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: #f43f5e;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(244, 63, 94, 0.3);
+}
+
+.rej-btn-confirm:hover:not(:disabled) {
+  background: #e11d48;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(244, 63, 94, 0.4);
+}
+
+.rej-btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Modal transition */
+.modal-fade-enter-active, .modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-from, .modal-fade-leave-to {
+  opacity: 0;
 }
 </style>

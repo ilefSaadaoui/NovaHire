@@ -112,6 +112,7 @@ import { Settings } from 'lucide-vue-next'
 
 import { useCompanyStore } from '@/stores/companyStore'
 import { useToastStore } from '@/stores/toastStore'
+import { useModalStore } from '@/stores/modalStore'
 
 const { t } = useI18n()
 const companyStore = useCompanyStore()
@@ -146,8 +147,6 @@ const deptForm = ref({ id: null, name: '', description: '' })
 const brandingForm = ref({
   companyName: '',
   logoUrl: '',
-  primaryColor: '#FFD700',
-  secondaryColor: '#000000',
   description: '',
   industry: '',
   website: '',
@@ -214,14 +213,30 @@ const handleToggleStatus = async (member) => {
 }
 
 const handleBulkStatus = async ({ ids, isActive }) => {
+  const modalStore = useModalStore()
   const actionText = isActive ? 'activer' : 'désactiver'
-  if (confirm(`Voulez-vous ${actionText} les ${ids.length} membres sélectionnés ?`)) {
+  const confirmed = await modalStore.confirm({
+    title: `${isActive ? 'Activer' : 'Désactiver'} les membres ?`,
+    message: `Voulez-vous ${actionText} les ${ids.length} membres sélectionnés ?`,
+    confirmText: isActive ? 'Activer' : 'Désactiver',
+    cancelText: 'Annuler',
+    type: 'warning'
+  })
+  if (confirmed) {
     await companyStore.bulkUpdateMembersStatus(ids, isActive)
   }
 }
 
 const handleBulkDelete = async (ids) => {
-  if (confirm(`ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement ces ${ids.length} membres ? Cette action est irréversible.`)) {
+  const modalStore = useModalStore()
+  const confirmed = await modalStore.confirm({
+    title: 'Suppression définitive',
+    message: `ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement ces ${ids.length} membres ? Cette action est irréversible.`,
+    confirmText: 'Supprimer',
+    cancelText: 'Annuler',
+    type: 'danger'
+  })
+  if (confirmed) {
     await companyStore.bulkRemoveMembers(ids)
   }
 }
@@ -231,7 +246,15 @@ const handleResendInvite = async (member) => {
 }
 
 const confirmDeleteMember = async (member) => {
-  if (confirm(`Êtes-vous sûr de vouloir retirer ${member.fullName} de l'équipe ?`)) {
+  const modalStore = useModalStore()
+  const confirmed = await modalStore.confirm({
+    title: 'Retirer ce membre ?',
+    message: `Êtes-vous sûr de vouloir retirer ${member.fullName} de l’équipe ?`,
+    confirmText: 'Retirer',
+    cancelText: 'Annuler',
+    type: 'danger'
+  })
+  if (confirmed) {
     await companyStore.removeTeamMember(member.id)
   }
 }
@@ -282,7 +305,15 @@ const submitDeptForm = async () => {
 }
 
 const confirmDeleteDept = async (dept) => {
-  if (confirm(`Voulez-vous vraiment supprimer le département ${dept.name} ?`)) {
+  const modalStore = useModalStore()
+  const confirmed = await modalStore.confirm({
+    title: 'Supprimer ce département ?',
+    message: `Voulez-vous vraiment supprimer le département « ${dept.name} » ? Cette action est irréversible.`,
+    confirmText: 'Supprimer',
+    cancelText: 'Annuler',
+    type: 'danger'
+  })
+  if (confirmed) {
     await companyStore.deleteDepartment(dept.id)
   }
 }

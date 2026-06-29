@@ -13,6 +13,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Contrôleur gérant le cycle de vie des offres d'emploi pour les recruteurs.
+    /// Gère la création, la lecture, la mise à jour, la suppression (archivage) et le suivi des statuts des offres.
+    /// Nécessite le rôle de recruteur ou supérieur.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Policy = "RecruiterOrAbove")]
@@ -22,6 +27,12 @@ namespace API.Controllers
         private readonly IUserRepository _userRepository;
         private readonly ApplicationDbContext _context;
 
+        /// <summary>
+        /// Initialise une nouvelle instance de la classe <see cref="JobOfferController"/>.
+        /// </summary>
+        /// <param name="jobOfferRepository">Repository pour la persistance des offres d'emploi.</param>
+        /// <param name="userRepository">Repository pour la gestion des utilisateurs.</param>
+        /// <param name="context">Contexte Entity Framework de l'application.</param>
         public JobOfferController(
             IJobOfferRepository jobOfferRepository,
             IUserRepository userRepository,
@@ -32,6 +43,11 @@ namespace API.Controllers
             _context = context;
         }
 
+        /// <summary>
+        /// Extrait l'identifiant de l'entreprise (CompanyId) à partir des claims du jeton JWT.
+        /// </summary>
+        /// <returns>Le CompanyId sous forme de Guid.</returns>
+        /// <exception cref="UnauthorizedAccessException">Si le claim CompanyId est absent ou invalide.</exception>
         private Guid GetCompanyId()
         {
             var companyIdClaim = User.FindFirst("CompanyId")?.Value;
@@ -42,6 +58,11 @@ namespace API.Controllers
             return companyId;
         }
 
+        /// <summary>
+        /// Extrait l'identifiant de l'utilisateur connecté (UserId) à partir des claims du jeton JWT.
+        /// </summary>
+        /// <returns>L'identifiant unique de l'utilisateur sous forme de Guid.</returns>
+        /// <exception cref="UnauthorizedAccessException">Si le claim NameIdentifier est absent ou invalide.</exception>
         private Guid GetUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -52,6 +73,13 @@ namespace API.Controllers
             return userId;
         }
 
+        /// <summary>
+        /// Enregistre un log d'activité pour l'action effectuée par l'utilisateur.
+        /// </summary>
+        /// <param name="action">L'intitulé de l'action (ex: "Publication d'offre").</param>
+        /// <param name="entityType">Le type d'entité concernée (ex: "JobOffer").</param>
+        /// <param name="entityId">L'identifiant unique de l'entité concernée.</param>
+        /// <param name="details">Détails textuels optionnels de l'activité.</param>
         private async Task LogActivity(string action, string entityType, string entityId, string? details = null)
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Guid.Empty.ToString());
@@ -73,6 +101,13 @@ namespace API.Controllers
             await _context.ActivityLogs!.AddAsync(log);
         }
 
+        /// <summary>
+        /// Récupère la liste paginée et éventuellement filtrée par statut des offres d'emploi de la compagnie.
+        /// </summary>
+        /// <param name="page">Le numéro de la page à récupérer (défaut : 1).</param>
+        /// <param name="limit">Le nombre d'éléments maximum par page (défaut : 10).</param>
+        /// <param name="status">Statut de filtre optionnel (Draft, Published, Archived, etc.).</param>
+        /// <returns>Un objet contenant la liste des DTOs d'offre d'emploi, le nombre total d'offres, la page courante et la limite.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int limit = 10, [FromQuery] string? status = null)
         {
@@ -80,7 +115,7 @@ namespace API.Controllers
             {
                 var companyId = GetCompanyId();
 
-                // Parse optional status
+                // Analyse et parsing du statut optionnel passé en paramètre
                 JobOfferStatus? statusFilter = null;
                 if (!string.IsNullOrEmpty(status) && Enum.TryParse<JobOfferStatus>(status, true, out var parsedStatus))
                 {
@@ -89,6 +124,7 @@ namespace API.Controllers
 
                 var (offers, totalCount) = await _jobOfferRepository.GetByCompanyIdPagedAsync(companyId, page, limit, statusFilter);
 
+                // Projection vers le DTO de retour
                 var dtosList = offers.Select(o => new JobOfferDetailDto
                 {
                     Id = o.Id,
@@ -119,8 +155,9 @@ namespace API.Controllers
                     } : null,
                     WeightExperience = o.WeightExperience,
                     WeightEducation = o.WeightEducation,
-                    WeightSkills = o.WeightSkills
-                }).ToList(); // Forcer l'exécution pour capturer les erreurs ici
+                    WeightSkills = o.WeightSkills,
+                    AutoRejectThreshold = o.AutoRejectThreshold
+                }).ToList(); // Forcer la projection immédiate pour attraper les éventuelles erreurs de mappage
 
                 return Ok(new
                 {
@@ -137,6 +174,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Récupère les détails complets d'une offre d'emploi par son ID unique.
+        /// </summary>
+        /// <param name="id">L'identifiant unique de l'offre d'emploi.</param>
+        /// <returns>Le DTO complet de l'offre d'emploi demandée.</returns>
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -145,6 +187,7 @@ namespace API.Controllers
                 var offer = await _jobOfferRepository.GetByIdAsync(id);
                 if (offer == null) return NotFound();
 
+                // Sécurité : Vérifier que l'offre appartient à la même entreprise
                 var companyId = GetCompanyId();
                 if (offer.CompanyId != companyId) return Forbid();
 
@@ -178,7 +221,8 @@ namespace API.Controllers
                     } : null,
                     WeightExperience = offer.WeightExperience,
                     WeightEducation = offer.WeightEducation,
-                    WeightSkills = offer.WeightSkills
+                    WeightSkills = offer.WeightSkills,
+                    AutoRejectThreshold = offer.AutoRejectThreshold
                 };
 
                 return Ok(dto);
@@ -189,6 +233,12 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Crée une nouvelle offre d'emploi pour l'entreprise de l'utilisateur connecté.
+        /// Empêche également la création de doublons accidentels dans un intervalle de 24 heures.
+        /// </summary>
+        /// <param name="dto">Les données nécessaires pour créer l'offre d'emploi.</param>
+        /// <returns>L'identifiant unique de l'offre créée ainsi que son token de partage.</returns>
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] JobOfferCreateDto dto)
         {
@@ -196,8 +246,26 @@ namespace API.Controllers
             {
                 var companyId = GetCompanyId();
                 var userId = GetUserId();
+                var department = dto.Department;
 
+                // Anti-spam / Doublon : Vérifie si une offre similaire a été créée par le même recruteur dans les dernières 24 heures
+                var existingOffer = await _jobOfferRepository.FindRecentDuplicateAsync(
+                    companyId,
+                    userId,
+                    dto.Title,
+                    dto.Location,
+                    department,
+                    TimeSpan.FromHours(24));
 
+                if (existingOffer != null)
+                {
+                    return Ok(new
+                    {
+                        id = existingOffer.Id,
+                        shareToken = existingOffer.ShareToken,
+                        message = "Offre déjà créée"
+                    });
+                }
 
                 var offer = new JobOffer
                 {
@@ -211,7 +279,7 @@ namespace API.Controllers
                     SalaryRange = dto.SalaryMin.HasValue && dto.SalaryMax.HasValue
                         ? $"{dto.SalaryMin}-{dto.SalaryMax}"
                         : null,
-                    Department = dto.Department,
+                    Department = department,
                     RemotePolicy = Enum.TryParse<RemotePolicy>(dto.RemotePolicy, true, out var remote) ? remote : RemotePolicy.Hybrid,
                     ExperienceLevel = Enum.TryParse<ExperienceLevel>(dto.ExperienceLevel, true, out var exp) ? exp : ExperienceLevel.Intermediate,
                     Skills = dto.Skills,
@@ -238,12 +306,13 @@ namespace API.Controllers
                     } : new ApplicationFormConfig(),
                     WeightExperience = dto.WeightExperience,
                     WeightEducation = dto.WeightEducation,
-                    WeightSkills = dto.WeightSkills
+                    WeightSkills = dto.WeightSkills,
+                    AutoRejectThreshold = ClampAutoRejectThreshold(dto.AutoRejectThreshold)
                 };
 
                 await _jobOfferRepository.AddAsync(offer);
                 
-                // Logging de l'activité
+                // Journalisation de l'activité
                 await LogActivity("Publication d'offre", "JobOffer", offer.Id.ToString(), $"Titre: {offer.Title}");
                 
                 await _jobOfferRepository.SaveChangesAsync();
@@ -262,6 +331,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Met à jour les informations et la configuration d'une offre d'emploi existante.
+        /// </summary>
+        /// <param name="id">L'identifiant unique de l'offre d'emploi à modifier.</param>
+        /// <param name="dto">Les nouvelles données de l'offre d'emploi.</param>
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] JobOfferCreateDto dto)
         {
@@ -270,6 +344,7 @@ namespace API.Controllers
                 var offer = await _jobOfferRepository.GetByIdAsync(id);
                 if (offer == null) return NotFound();
 
+                // Sécurité : L'offre doit appartenir à l'entreprise de l'utilisateur connecté
                 var companyId = GetCompanyId();
                 if (offer.CompanyId != companyId) return Forbid();
 
@@ -304,10 +379,11 @@ namespace API.Controllers
                 offer.WeightExperience = dto.WeightExperience;
                 offer.WeightEducation = dto.WeightEducation;
                 offer.WeightSkills = dto.WeightSkills;
+                offer.AutoRejectThreshold = ClampAutoRejectThreshold(dto.AutoRejectThreshold);
 
                 offer.UpdatedAt = DateTime.UtcNow;
 
-                // Sync status if visibility is provided
+                // Synchronisation du statut de publication si l'information de visibilité est transmise
                 if (!string.IsNullOrEmpty(dto.Visibility))
                 {
                     offer.Status = (dto.Visibility.ToLower() == "public" || dto.Visibility.ToLower() == "published")
@@ -322,7 +398,7 @@ namespace API.Controllers
 
                 await _jobOfferRepository.UpdateAsync(offer);
                 
-                // Logging
+                // Journalisation de la mise à jour
                 await LogActivity("Mise à jour d'offre", "JobOffer", offer.Id.ToString(), $"Offre: {offer.Title}");
                 
                 await _jobOfferRepository.SaveChangesAsync();
@@ -336,6 +412,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Met à jour uniquement le statut d'une offre d'emploi.
+        /// </summary>
+        /// <param name="id">L'identifiant unique de l'offre d'emploi concernée.</param>
+        /// <param name="dto">Le DTO contenant le nouveau statut sous forme de chaîne de caractères.</param>
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateJobStatusDto dto)
         {
@@ -361,7 +442,7 @@ namespace API.Controllers
 
                 await _jobOfferRepository.UpdateAsync(offer);
                 
-                // Logging
+                // Journalisation du changement de statut
                 await LogActivity("Changement de statut", "JobOffer", offer.Id.ToString(), $"Statut: {dto.Status}");
                 
                 await _jobOfferRepository.SaveChangesAsync();
@@ -374,8 +455,15 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// DTO local pour la mise à jour partielle du statut de l'offre d'emploi.
+        /// </summary>
         public class UpdateJobStatusDto { public string Status { get; set; } = string.Empty; }
 
+        /// <summary>
+        /// Supprime une offre d'emploi en effectuant un "Soft Delete" (marquée comme archivée).
+        /// </summary>
+        /// <param name="id">L'identifiant unique de l'offre d'emploi à archiver.</param>
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
@@ -387,13 +475,13 @@ namespace API.Controllers
                 var companyId = GetCompanyId();
                 if (offer.CompanyId != companyId) return Forbid();
 
-                // Soft Delete: Mark as Archived
+                // Suppression douce (Soft Delete) : On change son état à Archivée
                 offer.Status = JobOfferStatus.Archived;
                 offer.UpdatedAt = DateTime.UtcNow;
 
                 await _jobOfferRepository.UpdateAsync(offer);
                 
-                // Logging
+                // Journalisation de l'archivage
                 await LogActivity("Archivage d'offre", "JobOffer", offer.Id.ToString(), $"Offre: {offer.Title}");
                 
                 await _jobOfferRepository.SaveChangesAsync();
@@ -404,6 +492,17 @@ namespace API.Controllers
             {
                 return BadRequest(new { message = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// Limite le seuil de rejet automatique à une valeur comprise entre 0% et 80% maximum pour garder un contrôle humain minimum.
+        /// </summary>
+        /// <param name="value">La valeur soumise pour le seuil.</param>
+        /// <returns>La valeur ajustée.</returns>
+        private static int ClampAutoRejectThreshold(int value)
+        {
+            if (value <= 0) return 0;
+            return Math.Min(80, value);
         }
     }
 }

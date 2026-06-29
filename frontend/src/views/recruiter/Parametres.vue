@@ -227,7 +227,7 @@
                     <div class="lux-input-group">
                       <label class="imperial-label">{{ $t('settings.branding.website') }}</label>
                       <div class="lux-input-wrap">
-                        <input type="text" v-model="brandingForm.website" placeholder="https://..." class="lux-input-text">
+                        <input type="text" v-model="brandingForm.website" placeholder="URL" class="lux-input-text">
                       </div>
                     </div>
                   </div>
@@ -236,43 +236,25 @@
                     <div class="lux-input-group">
                       <label class="imperial-label">Pays</label>
                       <div class="lux-input-wrap">
-                        <input type="text" v-model="brandingForm.country" placeholder="Ex: France" class="lux-input-text">
+                        <input type="text" v-model="brandingForm.country" placeholder="Pays" class="lux-input-text">
                       </div>
                     </div>
 
                     <div class="lux-input-group">
                       <label class="imperial-label">Téléphone de contact</label>
                       <div class="lux-input-wrap">
-                        <input type="text" v-model="brandingForm.contactPhone" placeholder="+33 6..." class="lux-input-text">
+                        <input type="text" v-model="brandingForm.contactPhone" placeholder="Numéro" class="lux-input-text">
                       </div>
                     </div>
                   </div>
 
-                  <div class="form-grid-lux color-row">
-                    <div class="lux-input-group">
-                      <label class="imperial-label">{{ $t('settings.branding.colors') }} (Primary)</label>
-                      <div class="lux-color-box halo-gold">
-                        <div class="color-preview-circle" :style="{ background: brandingForm.primaryColor }"></div>
-                        <input type="color" v-model="brandingForm.primaryColor" class="hex-picker-hidden">
-                        <input type="text" v-model="brandingForm.primaryColor" class="lux-input-text">
-                      </div>
-                    </div>
-                    
-                    <div class="lux-input-group">
-                      <label class="imperial-label">{{ $t('settings.branding.colors') }} (Secondary)</label>
-                      <div class="lux-color-box">
-                        <div class="color-preview-circle" :style="{ background: brandingForm.secondaryColor }"></div>
-                        <input type="color" v-model="brandingForm.secondaryColor" class="hex-picker-hidden">
-                        <input type="text" v-model="brandingForm.secondaryColor" class="lux-input-text">
-                      </div>
-                    </div>
-                  </div>
+
 
                   <div class="lux-input-group">
                     <label class="imperial-label">{{ $t('settings.branding.logo') }}</label>
                     <div class="lux-input-wrap">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="input-icon"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                      <input type="text" v-model="brandingForm.logoUrl" placeholder="https://..." class="lux-input-text">
+                      <input type="text" v-model="brandingForm.logoUrl" placeholder="URL" class="lux-input-text">
                     </div>
                   </div>
                 </div>
@@ -280,7 +262,7 @@
                 <div class="branding-preview-lux">
                   <label class="preview-title-lux">{{ $t('settings.branding.preview') }}</label>
                   <div class="mockup-container-lux">
-                    <div class="mockup-frame" :style="{ '--brand-color': brandingForm.primaryColor, '--accent-color': brandingForm.secondaryColor }">
+                    <div class="mockup-frame">
                        <div class="mockup-navbar">
                           <img v-if="brandingForm.logoUrl" :src="brandingForm.logoUrl" class="mockup-logo">
                           <div v-else class="mockup-logo-placeholder">LOGO</div>
@@ -368,7 +350,7 @@
                   <label class="imperial-label">Email Professionnel</label>
                   <div class="lux-input-wrap">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="input-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                    <input type="email" v-model="inviteForm.email" required class="lux-input-text" placeholder="recruteur@entreprise.com">
+                    <input type="email" v-model="inviteForm.email" required class="lux-input-text" placeholder="email@entreprise.com">
                   </div>
                 </div>
 
@@ -475,6 +457,7 @@ import Sidebar from '@/components/layout/Sidebar.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useCompanyStore } from '@/stores/companyStore'
 import { useToastStore } from '@/stores/toastStore'
+import { useModalStore } from '@/stores/modalStore'
 
 export default {
   name: 'Parametres',
@@ -514,8 +497,6 @@ export default {
       brandingForm: {
         companyName: '',
         logoUrl: '',
-        primaryColor: '#FFD700',
-        secondaryColor: '#000000',
         description: '',
         industry: '',
         website: '',
@@ -589,7 +570,15 @@ export default {
       }
     },
     async confirmDeleteDept(dept) {
-      if (confirm(this.$t('notifications.memberRemoved').replace('Membre', 'Département'))) {
+      const modalStore = useModalStore()
+      const confirmed = await modalStore.confirm({
+        title: 'Supprimer ce département ?',
+        message: `Voulez-vous vraiment supprimer le département « ${dept.name} » ? Cette action est irréversible.`,
+        confirmText: 'Supprimer',
+        cancelText: 'Annuler',
+        type: 'danger'
+      })
+      if (confirmed) {
         await this.companyStore.deleteDepartment(dept.id)
       }
     },
@@ -625,8 +614,16 @@ export default {
       await this.companyStore.updateBranding(this.brandingForm)
       this.isSaving = false
     },
-    confirmDeleteMember(member) {
-      if (confirm(this.$t('notifications.memberRemoved').replace('Membre', member.fullName))) {
+    async confirmDeleteMember(member) {
+      const modalStore = useModalStore()
+      const confirmed = await modalStore.confirm({
+        title: 'Retirer ce membre ?',
+        message: `Êtes-vous sûr de vouloir retirer ${member.fullName} de l’équipe ?`,
+        confirmText: 'Retirer',
+        cancelText: 'Annuler',
+        type: 'danger'
+      })
+      if (confirmed) {
         this.companyStore.removeTeamMember(member.id)
       }
     },

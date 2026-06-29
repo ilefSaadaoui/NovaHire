@@ -119,7 +119,7 @@
                      </div>
                   </div>
                </div>
-               <button class="btn-premium btn-secondary w-full mt-20" @click="$router.push('/candidatures')">
+               <button class="btn-premium btn-secondary w-full mt-20" @click="$router.push({ path: '/candidatures', query: { jobOfferId: this.id } })">
                   {{ $t('reports.viewAllVivier') || 'Voir tout le vivier' }}
                </button>
             </div>

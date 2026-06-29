@@ -43,6 +43,7 @@
       </nav>
 
       <div class="top-actions">
+        <AuthThemeToggle />
         <router-link to="/connexion" class="btn btn-ghost">Se connecter</router-link>
         <router-link to="/inscription/entreprise" class="btn btn-accent">Créer un compte</router-link>
       </div>
@@ -148,33 +149,75 @@
               <label>Nom complet</label>
               <div class="input-shell">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <input v-model.trim="callbackForm.fullName" type="text" placeholder="Nom complet" required />
+                <input v-model.trim="callbackForm.fullName" type="text" placeholder="Votre nom complet" required />
               </div>
             </div>
             <div class="field">
               <label>Entreprise</label>
               <div class="input-shell">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="10" width="20" height="11" rx="2"/><path d="M7 10V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v5"/></svg>
-                <input v-model.trim="callbackForm.company" type="text" placeholder="Entreprise" required />
+                <input v-model.trim="callbackForm.company" type="text" placeholder="Nom de votre entreprise" />
               </div>
             </div>
             <div class="field">
               <label>Téléphone</label>
               <div class="input-shell">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                <input v-model.trim="callbackForm.phone" type="tel" placeholder="Téléphone" required />
+                <input v-model.trim="callbackForm.phone" type="tel" placeholder="+216 XX XXX XXX" />
               </div>
             </div>
             <div class="field">
               <label>E-mail</label>
               <div class="input-shell">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                <input v-model.trim="callbackForm.email" type="email" placeholder="Email" required />
+                <input v-model.trim="callbackForm.email" type="email" placeholder="votre@email.com" required />
               </div>
             </div>
           </div>
-          <button type="submit" class="submit-btn btn-wide">
-            Être rappelé(e) par un expert
+
+          <!-- Sujet : Custom Dropdown -->
+          <div class="field field-full">
+            <label>Sujet</label>
+            <div class="custom-dropdown" :class="{ open: subjectDropdownOpen, 'is-light': isLight }" @click.stop="toggleSubjectDropdown">
+              <div class="custom-dropdown-trigger">
+                <svg class="dd-icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="12" r="10"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span class="dd-value" :class="{ placeholder: !callbackForm.subject }">
+                  {{ callbackForm.subject || '— Choisir un sujet —' }}
+                </span>
+                <svg class="dd-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <div class="custom-dropdown-menu" v-show="subjectDropdownOpen" @click.stop>
+                <div
+                  v-for="opt in subjectOptions"
+                  :key="opt"
+                  class="custom-dropdown-item"
+                  :class="{ selected: callbackForm.subject === opt }"
+                  @click="selectSubject(opt)"
+                >
+                  {{ opt }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Message -->
+          <div class="field field-full">
+            <label>Message</label>
+            <div class="textarea-shell">
+              <textarea 
+                v-model.trim="callbackForm.message" 
+                placeholder="Décrivez votre demande, problème ou question en détail..." 
+                required 
+                rows="5"
+                maxlength="2000"
+              ></textarea>
+              <span class="char-count">{{ callbackForm.message.length }} / 2000</span>
+            </div>
+          </div>
+
+          <button type="submit" class="submit-btn btn-wide" :disabled="isSubmitting">
+            <span v-if="!isSubmitting">Envoyer le message</span>
+            <span v-else class="btn-loading">Envoi en cours…</span>
           </button>
         </form>
 
@@ -219,9 +262,16 @@
 <script>
 import logoUrl from '@/assets/Logo_NovaHire.png'
 import axios from 'axios'
+import AuthThemeToggle from '@/components/common/AuthThemeToggle.vue'
+import { useThemeStore } from '@/stores/themeStore'
 
 export default {
   name: 'Welcome',
+  components: { AuthThemeToggle },
+  setup() {
+    const themeStore = useThemeStore()
+    return { themeStore }
+  },
   data() {
     return {
       logoUrl,
@@ -235,8 +285,19 @@ export default {
         { name: 'LinkedIn', short: 'in', url: '#' },
         { name: 'Facebook', short: 'f', url: '#' }
       ],
-      callbackForm: { fullName: '', company: '', phone: '', email: '' },
+      callbackForm: { fullName: '', company: '', phone: '', email: '', subject: '', message: '' },
+      isSubmitting: false,
       callbackRequested: false,
+      subjectDropdownOpen: false,
+      subjectOptions: [
+        'Problème technique',
+        'Bug ou dysfonctionnement',
+        "Demande d'information",
+        'Demande de démonstration',
+        'Réclamation',
+        "Suggestion d'amélioration",
+        'Autre'
+      ],
       mouse: { x: -100, y: -100 },
       follower: { x: -100, y: -100 },
       isHovering: false,
@@ -255,15 +316,20 @@ export default {
     this.startTypewriter()
     window.addEventListener('mousemove', this.onMouseMove)
     window.addEventListener('mouseover', this.handleHover)
+    window.addEventListener('click', this.closeDropdownOnClickOutside)
     this.animateFollower()
   },
   beforeUnmount() {
     document.body.classList.remove('welcome-active')
     window.removeEventListener('mousemove', this.onMouseMove)
     window.removeEventListener('mouseover', this.handleHover)
+    window.removeEventListener('click', this.closeDropdownOnClickOutside)
     if (this._rafId) cancelAnimationFrame(this._rafId)
   },
   computed: {
+    isLight() {
+      return !this.themeStore.isDark
+    },
     followerStyle() {
       return {
         transform: `translate3d(${this.follower.x}px, ${this.follower.y}px, 0)`,
@@ -330,19 +396,35 @@ export default {
       const isInteractive = e.target.closest('a, button, .hov-lift, input')
       this.isHovering = !!isInteractive
     },
+    toggleSubjectDropdown() {
+      this.subjectDropdownOpen = !this.subjectDropdownOpen
+    },
+    selectSubject(opt) {
+      this.callbackForm.subject = opt
+      this.subjectDropdownOpen = false
+    },
+    closeDropdownOnClickOutside() {
+      this.subjectDropdownOpen = false
+    },
     async submitCallbackRequest() {
+      if (this.isSubmitting) return
+      if (!this.callbackForm.subject) return
+      this.isSubmitting = true
       try {
+        const fullMessage = `[${this.callbackForm.subject}] ${this.callbackForm.message}`
         await axios.post('/api/public/contact', {
           fullName: this.callbackForm.fullName,
           company: this.callbackForm.company,
           phone: this.callbackForm.phone,
           email: this.callbackForm.email,
-          message: "Demande de rappel via le site web (Expertise)"
+          message: fullMessage
         })
         this.callbackRequested = true
-        this.callbackForm = { fullName: '', company: '', phone: '', email: '' }
+        this.callbackForm = { fullName: '', company: '', phone: '', email: '', subject: '', message: '' }
       } catch (err) {
         console.error('Failed to submit contact request', err)
+      } finally {
+        this.isSubmitting = false
       }
     }
   }
@@ -604,7 +686,10 @@ export default {
 
 /* ─── CONTACT ─── */
 .contact-strip { padding: 60px; text-align: center; margin-bottom: 120px; }
+.contact-header { margin-bottom: 40px; }
 .contact-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; text-align: left; }
+.field { margin-bottom: 0; }
+.field-full { width: 100%; text-align: left; margin-top: 8px; margin-bottom: 8px; }
 .field label { font-size: 13px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; display: block; }
 .input-shell { position: relative; }
 .input-shell svg { 
@@ -615,10 +700,204 @@ export default {
 .field:nth-child(2) .input-shell svg { color: #F7C902; } /* Company: Gold */
 .field:nth-child(3) .input-shell svg { color: #8B5CF6; } /* Phone: Purple */
 .field:nth-child(4) .input-shell svg { color: #00A7E1; } /* Email: Cyan */
+.field-full .input-shell svg { color: #F59E0B; } /* Subject: Amber */
 
 .input-shell input {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 14px 14px 14px 48px;
+  color: white;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.input-shell input:focus {
+  outline: none;
+  border-color: rgba(0, 167, 225, 0.5);
+  box-shadow: 0 0 0 3px rgba(0, 167, 225, 0.1);
+}
+.input-shell input::placeholder { color: rgba(255,255,255,0.3); }
+
+/* ─── CUSTOM DROPDOWN ─── */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+  user-select: none;
+}
+
+/* ── Trigger bar ── */
+.custom-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.3s, box-shadow 0.3s, background 0.2s;
+  min-height: 52px;
+}
+
+/* Light mode trigger */
+.custom-dropdown.is-light .custom-dropdown-trigger {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.15);
+}
+
+.custom-dropdown.open .custom-dropdown-trigger,
+.custom-dropdown-trigger:hover {
+  border-color: rgba(0, 167, 225, 0.55);
+  box-shadow: 0 0 0 3px rgba(0, 167, 225, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.custom-dropdown.is-light.open .custom-dropdown-trigger,
+.custom-dropdown.is-light .custom-dropdown-trigger:hover {
+  background: #f0f9ff;
+  border-color: rgba(0, 167, 225, 0.55);
+}
+
+/* ── Left icon ── */
+.dd-icon-left {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #F59E0B;
+}
+
+/* ── Value text ── */
+.dd-value {
+  flex: 1;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: white;
+  text-align: left;
+}
+.dd-value.placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.custom-dropdown.is-light .dd-value {
+  color: #0f172a;
+}
+.custom-dropdown.is-light .dd-value.placeholder {
+  color: rgba(15, 23, 42, 0.38);
+}
+
+/* ── Chevron ── */
+.dd-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.25s ease, color 0.25s ease;
+}
+
+.custom-dropdown.is-light .dd-chevron {
+  color: rgba(15, 23, 42, 0.45);
+}
+
+.custom-dropdown.open .dd-chevron {
+  transform: rotate(180deg);
+  color: #00A7E1;
+}
+
+/* ── Dropdown menu panel ── */
+.custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
+  z-index: 999;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  animation: dropdownIn 0.18s ease;
+}
+
+/* Light mode menu panel */
+.custom-dropdown.is-light .custom-dropdown-menu {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Menu items ── */
+.custom-dropdown-item {
+  padding: 13px 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.custom-dropdown.is-light .custom-dropdown-item {
+  color: #1e293b;
+}
+
+.custom-dropdown-item:hover {
+  background: rgba(0, 167, 225, 0.12);
+  color: #00A7E1;
+}
+
+.custom-dropdown.is-light .custom-dropdown-item:hover {
+  background: #e0f5fd;
+  color: #0077B6;
+}
+
+.custom-dropdown-item.selected {
+  background: rgba(0, 167, 225, 0.15);
+  color: #00A7E1;
+  font-weight: 600;
+}
+
+.custom-dropdown.is-light .custom-dropdown-item.selected {
+  background: #cceeff;
+  color: #0077B6;
+}
+
+.textarea-shell { position: relative; }
+.textarea-shell textarea {
   width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 14px; padding: 14px 14px 14px 48px; color: white;
+  border-radius: 14px; padding: 16px; color: white; resize: vertical;
+  font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6;
+  min-height: 120px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.textarea-shell textarea:focus {
+  outline: none;
+  border-color: rgba(0, 167, 225, 0.5);
+  box-shadow: 0 0 0 3px rgba(0, 167, 225, 0.1);
+}
+.textarea-shell textarea::placeholder { color: rgba(255,255,255,0.3); }
+.char-count {
+  position: absolute; bottom: 12px; right: 16px;
+  font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 500;
+}
+
+.submit-btn:disabled {
+  opacity: 0.6; cursor: not-allowed; transform: none !important;
+}
+.btn-loading {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+
+.callback-success {
+  margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 10px;
+  color: #10b981; font-weight: 600; font-size: 15px;
+  padding: 16px; border-radius: 14px; background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 /* ─── BUTTONS (FROM LOGIN) ─── */
@@ -719,5 +998,134 @@ export default {
 .welcome-active input,
 .welcome-active .nav-link { 
   cursor: pointer !important; 
+}
+
+/* ─── LIGHT MODE OVERRIDES ─── */
+:global(body:not(.dark-mode) .auth-bg) {
+  background: #f4f7fe !important;
+}
+:global(body:not(.dark-mode) .bg-stars),
+:global(body:not(.dark-mode) .bg-aurora) {
+  display: none !important;
+}
+:global(body:not(.dark-mode) .bg-grid) {
+  opacity: 0.3;
+}
+:global(body:not(.dark-mode) .auth-bg .bg-orb-cyan) {
+  opacity: 0.3;
+}
+:global(body:not(.dark-mode) .auth-bg .bg-orb-purple) {
+  opacity: 0.2;
+}
+:global(body:not(.dark-mode) .auth-bg .bg-orb-gold) {
+  opacity: 0.2;
+}
+:global(body:not(.dark-mode) .welcome-page) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .welcome-title),
+:global(body:not(.dark-mode) .nav-link),
+:global(body:not(.dark-mode) .footer-col h3) {
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .hero-desc),
+:global(body:not(.dark-mode) .welcome-desc) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .glass-panel) {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .btn-ghost) {
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+:global(body:not(.dark-mode) .btn-ghost:hover) {
+  background: rgba(0, 0, 0, 0.05);
+}
+:global(body:not(.dark-mode) .input-shell input),
+:global(body:not(.dark-mode) .textarea-shell textarea),
+:global(body:not(.dark-mode) .contact-select) {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .contact-select option) {
+  background: #ffffff;
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .input-shell input::placeholder),
+:global(body:not(.dark-mode) .textarea-shell textarea::placeholder) {
+  color: rgba(0, 0, 0, 0.4);
+}
+:global(body:not(.dark-mode) .footer-link-list a) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .footer-link-list a:hover) {
+  color: #00A7E1;
+}
+:global(body:not(.dark-mode) .social-btn) {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+:global(body:not(.dark-mode) .hero-visual-3d) {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.08);
+}
+:global(body:not(.dark-mode) .img-overlay) {
+  background: linear-gradient(to top, rgba(244, 247, 254, 0.8), transparent 60%);
+}
+:global(body:not(.dark-mode) .kpi-card p),
+:global(body:not(.dark-mode) .solution-card p) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .field label) {
+  color: #475569;
+}
+:global(body:not(.dark-mode) .char-count) {
+  color: rgba(0, 0, 0, 0.5);
+}
+:global(body:not(.dark-mode) .contact-select) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(0,0,0,0.5)' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+/* ─── LIGHT MODE: CUSTOM DROPDOWN OVERRIDES ─── */
+:global(body:not(.dark-mode) .custom-dropdown-trigger) {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+}
+:global(body:not(.dark-mode) .custom-dropdown-trigger:hover),
+:global(body:not(.dark-mode) .custom-dropdown.open .custom-dropdown-trigger) {
+  background: #f0f9ff !important;
+  border-color: rgba(0, 167, 225, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(0, 167, 225, 0.1) !important;
+}
+:global(body:not(.dark-mode) .dd-value) {
+  color: #0f172a !important;
+}
+:global(body:not(.dark-mode) .dd-value.placeholder) {
+  color: rgba(15, 23, 42, 0.38) !important;
+}
+:global(body:not(.dark-mode) .dd-chevron) {
+  color: rgba(15, 23, 42, 0.45) !important;
+}
+:global(body:not(.dark-mode) .custom-dropdown-menu) {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12) !important;
+}
+:global(body:not(.dark-mode) .custom-dropdown-item) {
+  color: #1e293b !important;
+}
+:global(body:not(.dark-mode) .custom-dropdown-item:hover) {
+  background: #e0f5fd !important;
+  color: #0077B6 !important;
+}
+:global(body:not(.dark-mode) .custom-dropdown-item.selected) {
+  background: #cceeff !important;
+  color: #0077B6 !important;
 }
 </style>

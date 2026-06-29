@@ -1,31 +1,51 @@
 #pragma warning disable CS8601, CS8602, CS8604
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Application.DTOs.CompanyAdmin;
+using Application.Interfaces;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Contrôleur gérant toutes les opérations d'administration internes d'une entreprise (CompanyAdmin).
+    /// Gère les statistiques du tableau de bord (KPIs, entonnoir de recrutement, graphiques mensuels),
+    /// le branding de la marque (couleurs, logos), et la gestion de l'équipe (recruteurs, départements).
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Policy = "CompanyAdminOrAbove")]
     public class CompanyAdminController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IStorageService _storageService;
 
-        public CompanyAdminController(ApplicationDbContext context)
+        /// <summary>
+        /// Initialise une nouvelle instance de la classe <see cref="CompanyAdminController"/>.
+        /// </summary>
+        /// <param name="context">Contexte Entity Framework de l'application.</param>
+        /// <param name="storageService">Service de stockage cloud (Cloudinary).</param>
+        public CompanyAdminController(ApplicationDbContext context, IStorageService storageService)
         {
             _context = context;
+            _storageService = storageService;
         }
 
+        /// <summary>
+        /// Extrait l'identifiant de l'entreprise (CompanyId) à partir des claims du token JWT de l'utilisateur.
+        /// </summary>
+        /// <returns>L'ID de l'entreprise sous forme de Guid.</returns>
+        /// <exception cref="UnauthorizedAccessException">Si le CompanyId est introuvable.</exception>
         private Guid GetCompanyId()
         {
             var companyIdClaim = User.FindFirst("CompanyId")?.Value;
@@ -35,6 +55,13 @@ namespace API.Controllers
             return Guid.Parse(companyIdClaim);
         }
 
+        /// <summary>
+        /// Journalise une action d'administration de l'entreprise dans le journal d'activité de l'audit.
+        /// </summary>
+        /// <param name="action">L'action réalisée (ex: "Mise à jour Branding").</param>
+        /// <param name="entityType">Le type d'entité concernée (ex: "Branding", "User").</param>
+        /// <param name="entityId">L'identifiant unique de l'entité concernée.</param>
+        /// <param name="details">Informations textuelles optionnelles.</param>
         private async Task LogActivity(string action, string entityType, string entityId, string? details = null)
         {
             var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -57,6 +84,12 @@ namespace API.Controllers
             await _context.ActivityLogs!.AddAsync(log);
         }
 
+        /// <summary>
+        /// Calcule et récupère l'ensemble des statistiques de recrutement et de performance pour le tableau de bord de l'entreprise.
+        /// Calcule les KPIs (candidatures, offres actives, interviews prévues), la répartition par canal (Sourcing),
+        /// l'entonnoir de recrutement, le temps d'embauche et les statistiques individuelles de l'équipe.
+        /// </summary>
+        /// <returns>Un DTO <see cref="CompanyStatsDto"/> contenant les données statistiques compilées.</returns>
         [HttpGet("stats")]
         public async Task<IActionResult> GetDashboardStats()
         {
@@ -66,15 +99,16 @@ namespace API.Controllers
                 var today = DateTime.UtcNow.Date;
                 var sevenDaysAgo = today.AddDays(-7);
 
-                // Fetch company
+                // Récupération des informations de l'entreprise de session
                 var company = await _context.Companies!
                     .FirstOrDefaultAsync(c => c.Id == companyId);
 
                 if (company == null) return NotFound();
 
-                // Core KPIs
+                // Requête de base sur les candidatures pour l'entreprise connectée
                 var appsQuery = _context.JobApplications!.Where(a => a.JobOffer != null && a.JobOffer.CompanyId == companyId);
 
+                // Indicateurs clés de performance (KPIs) des candidatures
                 var totalApps = await appsQuery.CountAsync();
                 var appsToday = await appsQuery.CountAsync(a => a.AppliedAt >= today);
                 var appsThisWeek = await appsQuery.CountAsync(a => a.AppliedAt >= sevenDaysAgo);
@@ -89,7 +123,7 @@ namespace API.Controllers
                 var plannedInterviews = await _context.Interviews!
                     .CountAsync(i => i.JobApplication != null && i.JobApplication.JobOffer != null && i.JobApplication.JobOffer.CompanyId == companyId && i.ScheduledAt > DateTime.UtcNow);
 
-                // Monthly Graph (6 months)
+                // Construction de l'historique des candidatures des 6 derniers mois
                 var sixMonthsAgo = DateTime.UtcNow.AddMonths(-5);
                 sixMonthsAgo = new DateTime(sixMonthsAgo.Year, sixMonthsAgo.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
@@ -107,7 +141,7 @@ namespace API.Controllers
                     monthlyApplications.Add(count);
                 }
 
-                // Recruitment Funnel
+                // Données de l'entonnoir (funnel) de recrutement
                 var funnelData = new GlobalFunnelDto
                 {
                     Sourcing = (int)totalApps,
@@ -116,16 +150,9 @@ namespace API.Controllers
                     Offer = await appsQuery.CountAsync(a => a.Status == ApplicationStatus.Accepted)
                 };
 
-                // Real Sourcing Distribution (Simplified for better translation)
-                var rawSources = await appsQuery
-                    .Select(a => a.Source)
-                    .ToListAsync();
-                
-                var sourcingData = rawSources
-                    .GroupBy(s => s ?? "Direct / Autre")
-                    .ToDictionary(g => g.Key, g => g.Count());
 
-                // Efficiency Metrics
+
+                // Mesures d'efficacité du recrutement (Time-to-Hire)
                 var acceptedAppsData = await appsQuery
                     .Where(a => a.Status == ApplicationStatus.Accepted && a.ReviewedAt.HasValue)
                     .Select(a => new { a.AppliedAt, a.ReviewedAt })
@@ -137,7 +164,7 @@ namespace API.Controllers
                 
                 double aiEfficiency = totalApps > 0 ? (double)aiAnalysesCount / totalApps * 100 : 0;
 
-                // Team Stats
+                // Statistiques globales de performance de l'équipe de recrutement
                 var rawTeam = await _context.Users!
                     .Where(u => u.CompanyId == companyId)
                     .Select(u => new
@@ -161,7 +188,7 @@ namespace API.Controllers
                     InterviewsCount = u.InterviewsCount
                 }).ToList();
 
-                // Stats par département
+                // Statistiques cumulées par département
                 var rawDeptStats = await _context.JobOffers!
                     .Where(o => o.CompanyId == companyId)
                     .Select(o => new { o.Department, Id = o.Id })
@@ -187,7 +214,7 @@ namespace API.Controllers
                     })
                     .ToList();
 
-                // Recent Items
+                // Récupération des dernières offres ajoutées
                 var recentOffers = await _context.JobOffers!
                     .Where(o => o.CompanyId == companyId)
                     .OrderByDescending(o => o.CreatedAt)
@@ -201,7 +228,7 @@ namespace API.Controllers
                     })
                     .ToListAsync();
 
-                // Activity Logs
+                // Historique des activités récentes de l'entreprise
                 var allowedEntities = new[] { "JobOffer", "User", "Department", "Configuration", "Branding" };
                 var rawActivities = await _context.ActivityLogs!
                     .Where(l => l.CompanyId == companyId && allowedEntities.Contains(l.EntityType))
@@ -238,7 +265,6 @@ namespace API.Controllers
                     RecentOffers = recentOffers,
                     DepartmentStats = departmentStats,
                     FunnelData = funnelData,
-                    SourcingData = sourcingData,
                     AverageTimeToHire = Math.Round(avgTimeToHire, 1),
                     AiEfficiencyRate = Math.Round(aiEfficiency, 1),
                     RecentActivities = recentActivities
@@ -254,6 +280,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Traduit le statut interne de la candidature en français lisible.
+        /// </summary>
+        /// <param name="status">Statut interne de la candidature.</param>
+        /// <returns>Chaîne traduite en français.</returns>
         private static string TranslateStatus(ApplicationStatus status)
         {
             return status switch
@@ -269,6 +300,11 @@ namespace API.Controllers
             };
         }
 
+        /// <summary>
+        /// Calcule un affichage temporel relatif ("il y a 5 min") à partir d'un horodatage.
+        /// </summary>
+        /// <param name="dateTime">Horodatage de référence.</param>
+        /// <returns>Chaîne relative du temps écoulé.</returns>
         private static string GetTimeAgo(DateTime dateTime)
         {
             var span = DateTime.UtcNow - dateTime;
@@ -278,6 +314,10 @@ namespace API.Controllers
             return $"Il y a {(int)span.TotalDays} j";
         }
 
+        /// <summary>
+        /// Récupère la charte graphique et l'identité (Branding) de l'entreprise connectée.
+        /// </summary>
+        /// <returns>Les informations de branding et de contact de l'entreprise.</returns>
         [HttpGet("branding")]
         public async Task<IActionResult> GetBranding()
         {
@@ -302,6 +342,10 @@ namespace API.Controllers
             return Ok(company);
         }
 
+        /// <summary>
+        /// Met à jour la charte graphique (couleurs, logo) et les informations d'identité publique de l'entreprise.
+        /// </summary>
+        /// <param name="request">Les nouveaux éléments du branding.</param>
         [HttpPut("branding")]
         public async Task<IActionResult> UpdateBranding([FromBody] UpdateBrandingRequest request)
         {
@@ -322,7 +366,7 @@ namespace API.Controllers
 
             company.UpdatedAt = DateTime.UtcNow;
             
-            // Log activity
+            // Journalisation de l'activité
             await LogActivity("Mise à jour Branding", "Branding", companyId.ToString(), $"Société: {company.Name}");
             
             await _context.SaveChangesAsync();
@@ -330,6 +374,66 @@ namespace API.Controllers
             return Ok(new { message = "Branding mis à jour avec succès" });
         }
 
+        /// <summary>
+        /// Téléverse le logo de l'entreprise sur Cloudinary et met à jour l'URL du logo en base de données.
+        /// </summary>
+        /// <param name="file">Le fichier image du logo (jpg, jpeg, png, webp — max 2 Mo).</param>
+        /// <returns>L'URL Cloudinary sécurisée du nouveau logo.</returns>
+        [HttpPost("branding/logo")]
+        public async Task<IActionResult> UploadLogo(IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                    return BadRequest(new { message = "Aucun fichier sélectionné." });
+
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+                var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+                if (!allowedExtensions.Contains(extension))
+                    return BadRequest(new { message = "Format non supporté. Utilisez PNG, JPG ou WebP." });
+
+                if (file.Length > 2 * 1024 * 1024)
+                    return BadRequest(new { message = "Fichier trop volumineux. Maximum 2 Mo." });
+
+                var companyId = GetCompanyId();
+                var company = await _context.Companies!.FindAsync(companyId);
+                if (company == null) return NotFound();
+
+                // Supprimer l'ancien logo Cloudinary s'il existe
+                if (!string.IsNullOrEmpty(company.LogoUrl) && company.LogoUrl.Contains("cloudinary.com"))
+                {
+                    await _storageService.DeleteFileAsync(company.LogoUrl);
+                }
+
+                // Dossier de destination sur Cloudinary
+                var companyName = (company.Name ?? "General").Replace(" ", "_");
+                var folderPath = $"novahire/companies/{companyName}/logos";
+
+                string logoUrl;
+                using (var stream = file.OpenReadStream())
+                {
+                    logoUrl = await _storageService.UploadFileAsync(stream, file.FileName, folderPath);
+                }
+
+                company.LogoUrl = logoUrl;
+                company.UpdatedAt = DateTime.UtcNow;
+
+                await LogActivity("Upload Logo", "Branding", companyId.ToString(), $"Société: {company.Name}");
+                await _context.SaveChangesAsync();
+
+                return Ok(new { logoUrl });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Récupère la liste de tous les membres de l'équipe (recruteurs et administrateurs) associés à l'entreprise.
+        /// </summary>
+        /// <returns>Une liste de <see cref="TeamMemberDto"/>.</returns>
         [HttpGet("team")]
         public async Task<IActionResult> GetTeam()
         {
@@ -358,6 +462,11 @@ namespace API.Controllers
             return Ok(team);
         }
 
+        /// <summary>
+        /// Supprime un membre de l'équipe de l'entreprise.
+        /// Empêche un administrateur de supprimer son propre compte de session.
+        /// </summary>
+        /// <param name="id">L'identifiant du membre à supprimer.</param>
         [HttpDelete("team/{id}")]
         public async Task<IActionResult> RemoveMember(Guid id)
         {
@@ -366,13 +475,13 @@ namespace API.Controllers
 
             if (user == null) return NotFound();
 
-            // On ne peut pas se supprimer soi-même ou supprimer le dernier admin via cette API simplifiée
+            // Règle de sécurité : Un utilisateur ne peut pas s'auto-supprimer de l'équipe
             var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Guid.Empty.ToString());
             if (user.Id == currentUserId) return BadRequest("Vous ne pouvez pas supprimer votre propre compte.");
 
             _context.Users.Remove(user);
             
-            // Log activity
+            // Journalisation de l'activité
             await LogActivity("Suppression membre", "User", user.Id.ToString(), $"Email: {user.Email}");
             
             await _context.SaveChangesAsync();
@@ -380,28 +489,11 @@ namespace API.Controllers
             return Ok(new { message = "Membre supprimé" });
         }
 
-        /*
-        [HttpPatch("team/{id}/role")]
-        public async Task<IActionResult> UpdateMemberRole(Guid id, [FromBody] UpdateRoleRequest request)
-        {
-            var companyId = GetCompanyId();
-            var user = await _context.Users!.FirstOrDefaultAsync(u => u.Id == id && u.CompanyId == companyId);
-
-            if (user == null) return NotFound();
-
-            if (!Enum.TryParse<UserRole>(request.Role, true, out var newRole))
-            {
-                return BadRequest("Rôle invalide.");
-            }
-
-            user.Role = newRole;
-            user.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Rôle mis à jour" });
-        }
-        */
-
+        /// <summary>
+        /// Met à jour les informations et assignations (département, état actif/inactif) d'un membre de l'équipe.
+        /// </summary>
+        /// <param name="id">L'identifiant unique du membre à modifier.</param>
+        /// <param name="request">Les informations mises à jour.</param>
         [HttpPatch("team/{id}")]
         public async Task<IActionResult> UpdateMemberDetails(Guid id, [FromBody] UpdateMemberDetailsRequest request)
         {
@@ -419,7 +511,7 @@ namespace API.Controllers
 
             user.UpdatedAt = DateTime.UtcNow;
             
-            // Log activity
+            // Journalisation de la mise à jour
             await LogActivity("Mise à jour membre", "User", user.Id.ToString(), $"Email: {user.Email}");
             
             await _context.SaveChangesAsync();

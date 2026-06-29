@@ -139,15 +139,20 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RecruiterOrAbove", policy => policy.RequireRole("SuperAdmin", "CompanyAdmin", "Recruiter"));
 });
 
-// CORS
+// CORS — autoriser HTTP et HTTPS depuis localhost (dev) et l'URL frontend configurée (prod)
 builder.Services.AddCors(options =>
 {
+    var frontendUrl = configuration["AppSettings:FrontendUrl"] ?? "https://localhost:3010";
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.SetIsOriginAllowed(origin =>
               {
                   var host = new Uri(origin).Host;
-                  return host == "localhost" || host == "127.0.0.1";
+                  // Accepter localhost (HTTP + HTTPS) en développement
+                  if (host == "localhost" || host == "127.0.0.1")
+                      return true;
+                  // Accepter l'URL de production configurée
+                  return origin.StartsWith(frontendUrl, StringComparison.OrdinalIgnoreCase);
               })
               .AllowAnyMethod()
               .AllowAnyHeader()
@@ -228,9 +233,13 @@ if (app.Environment.IsDevelopment())
         c.RoutePrefix = "swagger";
     });
 }
-else 
+// HTTPS Redirection — active en développement ET en production
+app.UseHttpsRedirection();
+
+// HSTS — forcer HTTPS sur les navigateurs en production uniquement
+if (!app.Environment.IsDevelopment())
 {
-    app.UseHttpsRedirection();
+    app.UseHsts();
 }
 app.UseStaticFiles();
 

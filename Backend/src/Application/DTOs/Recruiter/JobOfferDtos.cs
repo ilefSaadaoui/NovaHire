@@ -27,6 +27,9 @@ namespace Application.DTOs.Recruiter
         public int WeightExperience { get; set; } = 40;
         public int WeightEducation { get; set; } = 30;
         public int WeightSkills { get; set; } = 30;
+
+        /// <summary>Score minimum (0 = désactivé). Candidats sous ce seuil sont refusés après analyse IA.</summary>
+        public int AutoRejectThreshold { get; set; } = 0;
     }
 
     public class JobOfferDetailDto
@@ -54,6 +57,7 @@ namespace Application.DTOs.Recruiter
         public int WeightExperience { get; set; }
         public int WeightEducation { get; set; }
         public int WeightSkills { get; set; }
+        public int AutoRejectThreshold { get; set; }
     }
 
     public class JobOfferFormConfigDto
