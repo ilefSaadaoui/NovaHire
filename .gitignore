@@ -32,10 +32,10 @@ Desktop.ini
 *.log
 npm-debug.log*
 
-# Environment files
+# Environment files (local secrets only)
 .env
 .env.local
-.env.*.local
+# Keep appsettings.Production.json (no secrets, overrides are injected via env vars on Render)
 
 # Temp/debug files
 api_build_error.txt
