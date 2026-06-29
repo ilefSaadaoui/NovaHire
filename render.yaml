@@ -9,7 +9,7 @@ services:
     name: novahire-ai
     runtime: docker
     dockerfilePath: ./Backend/src/AI/Dockerfile
-    dockerContext: ./Backend/src/AI
+    dockerContext: .
     plan: free
     region: frankfurt
     healthCheckPath: /health

@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # ── Python dependencies ──────────────────────────────────────
-COPY requirements.txt .
+COPY Backend/src/AI/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ── Download spaCy models ────────────────────────────────────
@@ -31,7 +31,7 @@ RUN python -m spacy download fr_core_news_lg && \
     python -m spacy download en_core_web_sm
 
 # ── Copy source code ─────────────────────────────────────────
-COPY . .
+COPY Backend/src/AI/ .
 
 # ── Tesseract path (Linux) ───────────────────────────────────
 ENV TESSERACT_CMD=/usr/bin/tesseract
