@@ -1,9 +1,14 @@
 import axios from 'axios'
 
+let apiBaseUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) || '/api';
+if (apiBaseUrl !== '/api' && !apiBaseUrl.endsWith('/api') && !apiBaseUrl.endsWith('/api/')) {
+    apiBaseUrl = apiBaseUrl.replace(/\/+$/, '') + '/api';
+}
+
 // Création d'une instance Axios centralisée
 const api = axios.create({
-    baseURL: '/api', // Proxy configuré dans vite.config.js
-    timeout: 10000 // Timeout de 10 secondes pour éviter les boutons bloquants
+    baseURL: apiBaseUrl,
+    timeout: 15000 // Timeout de 15 secondes pour les requêtes distantes
 })
 
 // Intercepteur pour les Requetes

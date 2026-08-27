@@ -196,7 +196,7 @@ const marketPulseData = computed(() => {
     dataPoints.push({ date: d, label: daysShort[d.getDay()], offers: 0, apps: 0 })
   }
 
-  adminStore.logs.forEach(log => {
+  (adminStore.logs || []).forEach(log => {
     const logDate = new Date(log.timestamp)
     logDate.setHours(0,0,0,0)
     const dp = dataPoints.find(p => p.date.getTime() === logDate.getTime())
@@ -235,7 +235,7 @@ const marketPulseData = computed(() => {
 
 // --- Chart.js: Role Distribution ---
 const roleChartData = computed(() => {
-  const dist = adminStore.summary.roleDistribution || {}
+  const dist = adminStore.summary?.roleDistribution || {}
   return {
     labels: ['Candidats', 'Admins', 'Recruteurs', 'Admin Plateformes'],
     datasets: [{
@@ -250,7 +250,7 @@ const roleChartData = computed(() => {
 // --- Chart.js: Industry Distribution ---
 const industryChartData = computed(() => {
   const counts = {}
-  adminStore.companies.forEach(c => {
+  (adminStore.companies || []).forEach(c => {
     const ind = c.industry || 'Autre'
     counts[ind] = (counts[ind] || 0) + 1
   })
