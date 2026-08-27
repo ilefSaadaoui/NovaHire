@@ -1,43 +1,71 @@
-# Dependencies
+# ============================================================
+# .gitignore — NovaHire (FullStack: .NET + Vue.js + Python FastAPI)
+# ============================================================
+
+# ── Dependencies ─────────────────────────────────────────────
 node_modules/
 frontend/node_modules/
+Backend/src/API/node_modules/
 
-# Build outputs
+# ── Build Outputs ────────────────────────────────────────────
 frontend/dist/
-Backend/src/API/bin/
-Backend/src/API/obj/
+dist/
+build/
+bin/
+obj/
+**/bin/
+**/obj/
+publish/
+**/publish/
 
-# Python
+# ── Python & Virtual Envs ────────────────────────────────────
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
 .venv/
 venv/
 env/
+ENV/
+*.egg-info/
+.pytest_cache/
 
-# IDE
+# ── IDEs & Editors ───────────────────────────────────────────
+.vs/
+**/.vs/
 .vscode/
+**/.vscode/
 .idea/
+**/.idea/
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
+*.swp
+*.swo
 
-# OS files
+# ── OS Generated Files ───────────────────────────────────────
 Thumbs.db
 Desktop.ini
 .DS_Store
+*.DS_Store
 
-# Logs
+# ── Logs & Crashes ───────────────────────────────────────────
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+crash_log.txt
+**/crash_log.txt
 
-# Environment files (local secrets only)
+# ── Environment & Secret Files ───────────────────────────────
 .env
 .env.local
-# Keep appsettings.Production.json (no secrets, overrides are injected via env vars on Render)
+.env.*.local
+*.local
+admin_credentials.txt
+**/admin_credentials.txt
 
-# Temp/debug files
+# ── Temporary & Debug Scripts ────────────────────────────────
 api_build_error.txt
 api_build_error_utf8.txt
 cv_content.txt
@@ -48,3 +76,8 @@ replace_storage.js
 tmp_test_edu.py
 tmp_test_lang_matching.py
 test_recruitment_rules.py
+check_db_users.js
+check_users.js
+test_login.js
+update_admin.sql
+cleanup_duplicate_offers.sql
