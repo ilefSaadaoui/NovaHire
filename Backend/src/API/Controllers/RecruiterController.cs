@@ -510,13 +510,17 @@ namespace API.Controllers
                         var success = await _emailService.SendRecruiterInvitationAsync(dto.Email, newPassword, companyName, senderName);
                         if (!success)
                         {
-                             return BadRequest(new { message = "L'envoi de l'invitation a échoué. Vérifiez vos paramètres SMTP (Gmail)." });
+                            return Ok(new { 
+                                message = $"Invitation réinitialisée avec succès. (Note: l'e-mail automatique n'a pas pu être envoyé car le serveur SMTP Gmail n'est pas encore configuré. Mot de passe temporaire : {newPassword})",
+                                tempPassword = newPassword,
+                                emailSent = false
+                            });
                         }
 
-                        return Ok(new { message = "Invitation renvoyée avec succès" });
+                        return Ok(new { message = "Invitation renvoyée avec succès par email.", emailSent = true });
                     }
 
-                    return BadRequest(new { message = "Cet email est deja rattache a un compte NovaHire." });
+                    return BadRequest(new { message = "Cet email est déjà rattaché à un compte NovaHire actif." });
                 }
 
                 // 2. Limite d'utilisateurs supprimée (système d'abonnement retiré)
@@ -553,10 +557,14 @@ namespace API.Controllers
                 
                 if (!invitationSuccess)
                 {
-                    return BadRequest(new { message = "L'envoi de l'invitation a échoué. Vérifiez vos paramètres SMTP (Gmail)." });
+                    return Ok(new { 
+                        message = $"Membre invité avec succès ! (Note: l'e-mail automatique n'a pas pu être envoyé car le serveur SMTP Gmail n'est pas encore configuré sur Render. Mot de passe temporaire généré : {tempPassword})",
+                        tempPassword = tempPassword,
+                        emailSent = false
+                    });
                 }
 
-                return Ok(new { message = "Invitation envoyée avec succès" });
+                return Ok(new { message = "Invitation envoyée avec succès par email.", emailSent = true });
             }
             catch (Exception ex)
             {

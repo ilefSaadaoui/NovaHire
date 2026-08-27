@@ -262,13 +262,30 @@ const deptOptions = computed(() => {
   transform: translateY(-1px);
 }
 .lux-input-text {
-  flex: 1; background: transparent; border: none; outline: none;
-  color: var(--r-text-main); font-weight: 600; font-size: 14px;
+  flex: 1; background: transparent !important; background-color: transparent !important; border: none !important; outline: none !important;
+  color: var(--r-text-main) !important; font-weight: 600; font-size: 14px;
   min-width: 0; padding: 8px 0;
   pointer-events: auto !important;
   cursor: text !important;
 }
 .lux-input-text::placeholder { color: #94a3b8; font-weight: 400; }
+
+/* Fix WebKit email autofill background */
+.lux-input-text:-webkit-autofill,
+.lux-input-text:-webkit-autofill:hover, 
+.lux-input-text:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--r-text-main) !important;
+  -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+  box-shadow: 0 0 0px 1000px transparent inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+:global(.dark-mode) .lux-input-text:-webkit-autofill,
+:global(.theme-dark) .lux-input-text:-webkit-autofill {
+  -webkit-text-fill-color: #f8fafc !important;
+  -webkit-box-shadow: 0 0 0px 1000px #0f172a inset !important;
+  box-shadow: 0 0 0px 1000px #0f172a inset !important;
+}
 
 /* ── Icon Box ── */
 .input-icon-box {
