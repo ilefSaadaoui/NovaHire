@@ -18,6 +18,9 @@ using System.Net;
 using System.Net.Sockets;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
+// Use polling file watcher to avoid Linux inotify instance limits in containerized environments (Render / Docker)
+Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "true");
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Configuration
