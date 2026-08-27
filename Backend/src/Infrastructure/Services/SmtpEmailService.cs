@@ -73,17 +73,20 @@ namespace Infrastructure.Services
         /// <returns>Une valeur indiquant si l'envoi a réussi ou non.</returns>
         private async Task<bool> SendAsync(MimeMessage message)
         {
-            // Si aucun serveur SMTP n'est configuré, enregistre un log et retourne false pour que l'appelant sache que l'e-mail n'a pas été envoyé.
-            if (string.IsNullOrWhiteSpace(_settings.SmtpHost))
+            // Si aucun serveur SMTP ou mot de passe configuré, enregistre un log et retourne false
+            if (string.IsNullOrWhiteSpace(_settings.SmtpHost) || 
+                string.IsNullOrWhiteSpace(_settings.Password) || 
+                _settings.Password.StartsWith("YOUR_"))
             {
-                _logger.LogWarning("SMTP host not configured. Email cannot be sent. Message subject: {Subject}", message.Subject);
+                _logger.LogWarning("SMTP non configuré ou mot de passe d'application manquant. L'e-mail n'a pas été envoyé. Sujet: {Subject}", message.Subject);
                 return false;
             }
 
             try
             {
                 using var client = new SmtpClient();
-                // Accepte tous les certificats SSL (utile en développement) ; à retirer en production pour des raisons de sécurité
+                client.Timeout = 4000; // Timeout strict de 4 secondes pour ne jamais bloquer l'expérience utilisateur
+                // Accepte tous les certificats SSL
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
                 if (_settings.SmtpPort == 465)
