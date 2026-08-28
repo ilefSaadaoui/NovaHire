@@ -169,9 +169,9 @@ export const useCompanyStore = defineStore('company', {
     },
 
     async resendInvitation(member) {
+      const toast = useToastStore()
       try {
-        // Calling same invite endpoint re-triggers the token and email
-        await api.post('/recruiter/invite', {
+        const response = await api.post('/recruiter/invite', {
           email: member.email,
           firstName: member.firstName,
           lastName: member.lastName,
@@ -179,10 +179,34 @@ export const useCompanyStore = defineStore('company', {
           jobTitle: member.jobTitle || '',
           departmentId: member.departmentId || null
         })
-        useToastStore().show(`Invitation renvoyée à ${member.email}`, 'success')
+
+        const data = response.data
+
+        if (data.emailSent === false) {
+          // SMTP failed but account was reset — show the temp password to the admin
+          const pwd = data.tempPassword || '(voir logs backend)'
+          toast.show(
+            `✅ Invitation réinitialisée. ⚠️ E-mail non envoyé (SMTP non configuré).\n\nMot de passe temporaire : ${pwd}\n\nCommuniquez-le manuellement à ${member.email}.`,
+            'warning'
+          )
+          // Also alert so the admin can copy it easily
+          window.alert(
+            `Invitation réinitialisée pour ${member.firstName} ${member.lastName}.\n\n` +
+            `📧 Email : ${member.email}\n` +
+            `🔑 Mot de passe temporaire : ${pwd}\n\n` +
+            `Communiquez ce mot de passe directement au recruteur pour qu'il puisse se connecter.`
+          )
+        } else {
+          toast.show(`✅ Invitation envoyée avec succès à ${member.email}`, 'success')
+        }
       } catch (error) {
+        // axios interceptor already shows a global toast for network errors
+        // Only show a specific toast for non-network errors (backend 4xx)
+        if (error.response) {
+          const msg = error.response.data?.message || 'Échec du renvoi de l\'invitation'
+          toast.show(msg, 'error')
+        }
         console.error('Error resending invite:', error)
-        useToastStore().show('Échec du renvoi de l\'invitation', 'error')
       }
     },
 
