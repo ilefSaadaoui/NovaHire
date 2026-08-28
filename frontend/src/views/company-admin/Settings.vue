@@ -154,13 +154,24 @@ const brandingForm = ref({
   contactPhone: ''
 })
 
+const backendDown = ref(false)
+
+const loadData = async () => {
+  try {
+    await Promise.all([
+      companyStore.fetchTeam(),
+      companyStore.fetchDepartments(),
+      companyStore.fetchBranding()
+    ])
+    backendDown.value = false
+    brandingForm.value = { ...companyStore.branding }
+  } catch {
+    // already silent — no toast shown
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([
-    companyStore.fetchTeam(),
-    companyStore.fetchDepartments(),
-    companyStore.fetchBranding()
-  ])
-  brandingForm.value = { ...companyStore.branding }
+  await loadData()
 })
 
 // Methods: Team
