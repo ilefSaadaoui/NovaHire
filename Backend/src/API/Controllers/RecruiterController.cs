@@ -546,7 +546,7 @@ namespace API.Controllers
                 }
                 else if (isSuperAdmin)
                 {
-                    var allCompanies = await _companyRepository.GetAllActiveCompaniesAsync();
+                    var allCompanies = await _companyRepository.GetAllActiveAsync();
                     company = allCompanies.FirstOrDefault();
                     if (company != null) companyId = company.Id;
                 }
