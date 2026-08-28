@@ -95,5 +95,6 @@ namespace Application.DTOs.Recruiter
         public string? JobTitle { get; set; }
         public string Role { get; set; } = "Recruiter";
         public Guid? DepartmentId { get; set; }
+        public Guid? CompanyId { get; set; }
     }
 }

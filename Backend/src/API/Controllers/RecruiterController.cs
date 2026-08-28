@@ -481,28 +481,43 @@ namespace API.Controllers
         {
             try
             {
-                var companyId = GetCompanyId();
+                var isSuperAdmin = User.IsInRole("SuperAdmin") || User.FindFirst(ClaimTypes.Role)?.Value == "SuperAdmin" || User.FindFirst("role")?.Value == "SuperAdmin";
+                Guid companyId = Guid.Empty;
+
+                if (isSuperAdmin)
+                {
+                    if (dto.CompanyId.HasValue && dto.CompanyId.Value != Guid.Empty)
+                    {
+                        companyId = dto.CompanyId.Value;
+                    }
+                }
+                else
+                {
+                    companyId = GetCompanyId();
+                }
+
                 var adminId = GetUserId();
                 var admin = await _userRepository.GetByIdAsync(adminId);
 
                 // 1. Vérifier si l'email est déjà pris
-                // 1. Verifier si l'email est deja pris
                 var existingUser = await _userRepository.GetByEmailAsync(dto.Email);
                 if (existingUser != null)
                 {
-                    // Si l'utilisateur appartient a la meme societe et n'a jamais ete connecte, on autorise le renvoi
-                    if (existingUser.CompanyId == companyId && existingUser.LastLoginAt == null)
+                    // Si l'utilisateur appartient à la même société (ou si SuperAdmin), on autorise le renvoi
+                    if (isSuperAdmin || (existingUser.CompanyId == companyId && existingUser.LastLoginAt == null))
                     {
-                        var invitationCompany = await _companyRepository.GetActiveCompanyByIdAsync(companyId);
+                        var targetCompanyId = existingUser.CompanyId ?? companyId;
+                        var invitationCompany = targetCompanyId != Guid.Empty ? await _companyRepository.GetActiveCompanyByIdAsync(targetCompanyId) : null;
                         var companyName = invitationCompany?.Name ?? "NovaHire";
-                        var senderName = admin?.FullName ?? "Votre Administrateur";
+                        var senderName = admin?.FullName ?? "L'Administrateur Plateforme";
                         string newPassword = GenerateSimpleTempPassword(14);
                         
                         existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
-                        existingUser.FirstName = dto.FirstName;
-                        existingUser.LastName = dto.LastName;
-                        existingUser.JobTitle = dto.JobTitle;
-                        existingUser.DepartmentId = dto.DepartmentId;
+                        if (!string.IsNullOrWhiteSpace(dto.FirstName)) existingUser.FirstName = dto.FirstName;
+                        if (!string.IsNullOrWhiteSpace(dto.LastName)) existingUser.LastName = dto.LastName;
+                        if (!string.IsNullOrWhiteSpace(dto.JobTitle)) existingUser.JobTitle = dto.JobTitle;
+                        if (dto.DepartmentId.HasValue) existingUser.DepartmentId = dto.DepartmentId;
+                        existingUser.MustChangePassword = true;
                         existingUser.UpdatedAt = DateTime.UtcNow;
 
                         await _userRepository.UpdateAsync(existingUser);
@@ -511,7 +526,7 @@ namespace API.Controllers
                         if (!success)
                         {
                             return Ok(new { 
-                                message = $"Invitation réinitialisée avec succès. (Note: l'e-mail automatique n'a pas pu être envoyé car le serveur SMTP Gmail n'est pas encore configuré. Mot de passe temporaire : {newPassword})",
+                                message = $"Invitation réinitialisée avec succès. (Note: l'e-mail automatique n'a pas pu être envoyé par SMTP. Mot de passe temporaire : {newPassword})",
                                 tempPassword = newPassword,
                                 emailSent = false
                             });
@@ -523,9 +538,21 @@ namespace API.Controllers
                     return BadRequest(new { message = "Cet email est déjà rattaché à un compte NovaHire actif." });
                 }
 
-                // 2. Limite d'utilisateurs supprimée (système d'abonnement retiré)
-                var company = await _companyRepository.GetActiveCompanyByIdAsync(companyId);
-                if (company == null) return BadRequest(new { message = "Société introuvable." });
+                // 2. Récupérer la société
+                Company? company = null;
+                if (companyId != Guid.Empty)
+                {
+                    company = await _companyRepository.GetActiveCompanyByIdAsync(companyId);
+                }
+                else if (isSuperAdmin)
+                {
+                    var allCompanies = await _companyRepository.GetAllActiveCompaniesAsync();
+                    company = allCompanies.FirstOrDefault();
+                    if (company != null) companyId = company.Id;
+                }
+
+                if (company == null && !isSuperAdmin) return BadRequest(new { message = "Société introuvable." });
+                var companyNameFinal = company?.Name ?? "NovaHire";
 
                 // 3. Générer un mot de passe temporaire complexe
                 string tempPassword = GenerateSimpleTempPassword(14);
@@ -540,7 +567,7 @@ namespace API.Controllers
                     JobTitle = dto.JobTitle,
                     Role = UserRole.Recruiter, // Strict role for this endpoint
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword),
-                    CompanyId = companyId,
+                    CompanyId = companyId != Guid.Empty ? companyId : null,
                     DepartmentId = dto.DepartmentId,
                     IsActive = true,
                     MustChangePassword = true,
@@ -552,13 +579,13 @@ namespace API.Controllers
                 await _userRepository.SaveChangesAsync();
 
                 // 5. Envoyer l'e-mail premium
-                var adminName = admin?.FullName ?? "Votre Administrateur";
-                var invitationSuccess = await _emailService.SendRecruiterInvitationAsync(dto.Email, tempPassword, company.Name, adminName);
+                var adminName = admin?.FullName ?? "L'Administrateur Plateforme";
+                var invitationSuccess = await _emailService.SendRecruiterInvitationAsync(dto.Email, tempPassword, companyNameFinal, adminName);
                 
                 if (!invitationSuccess)
                 {
                     return Ok(new { 
-                        message = $"Membre invité avec succès ! (Note: l'e-mail automatique n'a pas pu être envoyé car le serveur SMTP Gmail n'est pas encore configuré sur Render. Mot de passe temporaire généré : {tempPassword})",
+                        message = $"Membre invité avec succès ! (Note: l'e-mail automatique n'a pas pu être envoyé par SMTP. Mot de passe temporaire généré : {tempPassword})",
                         tempPassword = tempPassword,
                         emailSent = false
                     });
@@ -569,7 +596,7 @@ namespace API.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"[RecruiterController] Error in InviteRecruiter: {ex.Message}");
-                return BadRequest(new { message = "Une erreur est survenue lors de l'envoi de l'invitation." });
+                return BadRequest(new { message = "Une erreur est survenue lors de l'envoi de l'invitation: " + ex.Message });
             }
         }
 

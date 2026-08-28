@@ -76,7 +76,8 @@ namespace Infrastructure.Services
             // Si aucun serveur SMTP ou mot de passe configuré, enregistre un log et retourne false
             if (string.IsNullOrWhiteSpace(_settings.SmtpHost) || 
                 string.IsNullOrWhiteSpace(_settings.Password) || 
-                _settings.Password.StartsWith("YOUR_"))
+                _settings.Password.StartsWith("YOUR_") ||
+                _settings.Password.Contains("PLACEHOLDER"))
             {
                 _logger.LogWarning("SMTP non configuré ou mot de passe d'application manquant. L'e-mail n'a pas été envoyé. Sujet: {Subject}", message.Subject);
                 return false;
@@ -85,18 +86,19 @@ namespace Infrastructure.Services
             try
             {
                 using var client = new SmtpClient();
-                client.Timeout = 4000; // Timeout strict de 4 secondes pour ne jamais bloquer l'expérience utilisateur
-                // Accepte tous les certificats SSL
+                // 15 secondes pour permettre la négociation TLS et l'authentification avec smtp.gmail.com sur le cloud
+                client.Timeout = 15000;
+                // Accepte les certificats valides
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
                 if (_settings.SmtpPort == 465)
                 {
-                    // Le port 465 utilise le protocole SSL implicite (SslOnConnect)
+                    // Port 465 : SSL direct
                     await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, MailKit.Security.SecureSocketOptions.SslOnConnect).ConfigureAwait(false);
                 }
-                else if (_settings.EnableSsl)
+                else if (_settings.SmtpPort == 587 || _settings.EnableSsl)
                 {
-                    // Le port 587 ou les autres ports SSL utilisent généralement STARTTLS
+                    // Port 587 : STARTTLS (recommandé pour Google Workspace et Gmail sur le Cloud)
                     await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, MailKit.Security.SecureSocketOptions.StartTls).ConfigureAwait(false);
                 }
                 else
@@ -112,12 +114,12 @@ namespace Infrastructure.Services
                 await client.SendAsync(message).ConfigureAwait(false);
                 await client.DisconnectAsync(true).ConfigureAwait(false);
 
-                _logger.LogInformation("Email sent to {To} with subject {Subject}", message.To, message.Subject);
+                _logger.LogInformation("Email sent successfully to {To} with subject {Subject}", message.To, message.Subject);
                 return true;
             }
             catch (System.Exception ex)
             {
-                _logger.LogError(ex, "Failed to send email to {To} with subject {Subject}", message.To, message.Subject);
+                _logger.LogError(ex, "Failed to send email to {To} with subject {Subject}. Error: {Error}", message.To, message.Subject, ex.Message);
                 return false;
             }
         }

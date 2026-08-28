@@ -28,6 +28,7 @@ namespace API.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ICurrentUserService _currentUserService;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
 
         /// <summary>
         /// Initialise une nouvelle instance de la classe <see cref="AdminController"/>.
@@ -35,11 +36,13 @@ namespace API.Controllers
         /// <param name="context">Contexte de la base de données.</param>
         /// <param name="currentUserService">Service de gestion de l'utilisateur connecté.</param>
         /// <param name="configuration">Configuration de l'application.</param>
-        public AdminController(ApplicationDbContext context, ICurrentUserService currentUserService, IConfiguration configuration)
+        /// <param name="emailService">Service d'envoi d'e-mails.</param>
+        public AdminController(ApplicationDbContext context, ICurrentUserService currentUserService, IConfiguration configuration, IEmailService emailService)
         {
             _context = context;
             _currentUserService = currentUserService;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         /// <summary>
@@ -292,6 +295,57 @@ namespace API.Controllers
             await LogActivity("DELETE", "User", user.Id.ToString(), $"Suppression utilisateur: {user.Email}");
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        /// <summary>
+        /// Renvoie une invitation par e-mail avec un mot de passe temporaire pour un utilisateur (SuperAdmin).
+        /// </summary>
+        [HttpPost("users/{id}/resend-invitation")]
+        public async Task<IActionResult> ResendUserInvitation(Guid id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound(new { message = "Utilisateur introuvable." });
+
+            string tempPassword = GenerateSimpleTempPassword(14);
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
+            user.MustChangePassword = true;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            var companyName = "NovaHire";
+            if (user.CompanyId.HasValue)
+            {
+                var company = await _context.Companies.FindAsync(user.CompanyId.Value);
+                if (company != null) companyName = company.Name;
+            }
+
+            var emailSuccess = await _emailService.SendRecruiterInvitationAsync(
+                user.Email, 
+                tempPassword, 
+                companyName, 
+                "L'Administrateur Plateforme NovaHire"
+            );
+
+            await LogActivity("INVITE", "User", user.Id.ToString(), $"Renvoi invitation: {user.Email} (Email: {(emailSuccess ? "Envoyé" : "Échoué")})");
+
+            return Ok(new
+            {
+                message = emailSuccess 
+                    ? $"Invitation renvoyée avec succès à {user.Email}." 
+                    : $"Invitation réinitialisée. (Note: l'e-mail automatique n'a pas pu être envoyé par SMTP. Mot de passe temporaire : {tempPassword})",
+                tempPassword = tempPassword,
+                emailSent = emailSuccess
+            });
+        }
+
+        private string GenerateSimpleTempPassword(int length)
+        {
+            const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
+            var random = new Random();
+            return new string(Enumerable.Repeat(chars, length)
+                .Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
         // ==================== ENTREPRISES ====================
