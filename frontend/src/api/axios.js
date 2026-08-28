@@ -39,7 +39,7 @@ api.interceptors.response.use(
         const toast = useToastStore()
 
         // Si la requête a défini silentError: true, on ne montre pas de toast
-            const silent = error.config?.silentError === true
+            const silent = error.config?.silentError === true || error.config?.params?.silentError === true
 
             if (error.response) {
             // Le back-end a retourné un code d'erreur (4xx, 5xx)

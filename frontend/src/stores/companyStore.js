@@ -41,7 +41,7 @@ export const useCompanyStore = defineStore('company', {
 
     async fetchBranding() {
       try {
-        const res = await api.get('/companyadmin/branding')
+        const res = await api.get('/companyadmin/branding', { silentError: true })
         this.branding = res.data
       } catch (error) {
         console.error('Error fetching branding:', error)
@@ -59,7 +59,7 @@ export const useCompanyStore = defineStore('company', {
 
     async fetchTeam() {
       try {
-        const res = await api.get('/companyadmin/team')
+        const res = await api.get('/companyadmin/team', { silentError: true })
         this.team = res.data.map(u => ({
           ...u,
           fullName: `${u.firstName} ${u.lastName}`,
@@ -214,10 +214,23 @@ export const useCompanyStore = defineStore('company', {
 
     async fetchDepartments() {
       try {
-        const res = await api.get('/department')
+        const res = await api.get('/department', { silentError: true })
         this.departments = res.data
       } catch (error) {
         console.error('Error fetching departments:', error)
+      }
+    },
+
+    async toggleMemberStatus(memberId, isActive) {
+      try {
+        const member = this.team.find(m => m.id === memberId)
+        if (!member) return
+        await api.patch(`/companyadmin/team/${memberId}`, { ...member, isActive })
+        const index = this.team.findIndex(m => m.id === memberId)
+        if (index !== -1) this.team[index].isActive = isActive
+      } catch (error) {
+        console.error('Error toggling member status:', error)
+        throw error
       }
     },
 
